@@ -1,12 +1,15 @@
 import sys
 from resource_agent.agent.react_agent import ReactAgent
+from resource_agent.config import load_env_file
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python main.py <task>")
-        return 
+    load_env_file()
+
+    # if len(sys.argv) < 2:
+    #     print("Usage: python main.py <task>")
+    #     return 
     
-    task = sys.argv[1]
+    task = "Search latest information about Cedar Gate Nepal for AI Engineer interview preparation."
     agent = ReactAgent()
     result = agent.run(task)
     print("Agent State:")

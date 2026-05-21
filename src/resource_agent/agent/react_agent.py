@@ -114,9 +114,14 @@ class ReactAgent:
         """
 
         if hasattr(tool_result, "model_dump"):
-            return tool_result.model_dump()
+            normalized = tool_result.model_dump()
+            if normalized.get("error_message") and "error" not in normalized:
+                normalized["error"] = normalized["error_message"]
+            return normalized
 
         if isinstance(tool_result, dict):
+            if tool_result.get("error_message") and "error" not in tool_result:
+                return {**tool_result, "error": tool_result["error_message"]}
             return tool_result
 
         return {
@@ -159,7 +164,24 @@ class ReactAgent:
             )
 
         if tool_name == "web_search":
-            return f"Here are the web search results:\n\n{data}"
+            answer = data.get("answer")
+            sources = data.get("sources", [])
+
+            source_lines = []
+
+            for index, source in enumerate(sources, start=1):
+                source_lines.append(
+                    f"{index}. {source.get('title')}\n"
+                    f"URL: {source.get('url')}\n"
+                    f"Summary: {source.get('content')}"
+                )
+
+            return (
+                "Web search completed.\n\n"
+                f"Search answer:\n{answer if answer else 'No direct answer returned.'}\n\n"
+                "Sources:\n"
+                + "\n\n".join(source_lines)
+            )
 
         if tool_name == "code_execution":
             stdout = data.get("stdout", "")
