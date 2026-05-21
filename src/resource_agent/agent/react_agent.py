@@ -96,8 +96,9 @@ class ReactAgent:
                 )
 
                 if not normalized_result.get("success", False):
+                    error_text = normalized_result.get("error") or "Unknown error"
                     state.mark_failed(
-                        f"Tool '{action}' failed: {normalized_result.get('error')}"
+                        f"Tool '{action}' failed: {error_text}"
                     )
                     return state
 
@@ -155,7 +156,16 @@ class ReactAgent:
         - Pydantic model with model_dump()
         - older Pydantic model with dict()
         """
-
+        def to_observation(payload: Dict[str, Any]) -> Dict[str,Any]:
+            error = payload.get("error")
+            if error is None:
+                error = payload.get("error_message")
+            return {
+                "success": payload.get("success", False),
+                "tool_name": payload.get("tool_name", tool_name),
+                "data": payload.get("data", {}),
+                "error": error,
+            }
         if result is None:
             return {
                 "success": False,
@@ -165,30 +175,15 @@ class ReactAgent:
             }
 
         if isinstance(result, dict):
-            return {
-                "success": result.get("success", False),
-                "tool_name": result.get("tool_name", tool_name),
-                "data": result.get("data", {}),
-                "error": result.get("error"),
-            }
+            return to_observation(result)
 
         if hasattr(result, "model_dump"):
             dumped = result.model_dump()
-            return {
-                "success": dumped.get("success", False),
-                "tool_name": dumped.get("tool_name", tool_name),
-                "data": dumped.get("data", {}),
-                "error": dumped.get("error"),
-            }
+            return to_observation(dumped)
 
         if hasattr(result, "dict"):
             dumped = result.dict()
-            return {
-                "success": dumped.get("success", False),
-                "tool_name": dumped.get("tool_name", tool_name),
-                "data": dumped.get("data", {}),
-                "error": dumped.get("error"),
-            }
+            return to_observation(dumped)
 
         return {
             "success": False,

@@ -2,12 +2,14 @@ import os
 from typing import Dict, Any, List
 from resource_agent.tools.base import BaseTool, ToolResult
 from resource_agent.config import load_env_file
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 try:
     from tavily import TavilyClient
 except ImportError:
     TavilyClient = None
 
+TIMEOUT_SECONDS = 10
 class WebSearchTool(BaseTool):
     name = "web_search_tool"
     description = ("Searches the web for information based on a query. It accepts a search query as input and returns relevant search results."
@@ -24,9 +26,9 @@ class WebSearchTool(BaseTool):
             self.client = None
     
     def run(self, arguments: Dict[str, Any]) -> ToolResult:
-        query = arguments.get("query", "")
+        query = arguments.get("query")
         max_results = arguments.get("max_results", 5)
-        topic = arguments.get("topic", "")
+        topic = arguments.get("topic")
 
         if not query:
             return ToolResult(
@@ -50,12 +52,9 @@ class WebSearchTool(BaseTool):
             )
         
         try:
-            search_response = self.client.search(
-                query=query,
-                topic=topic,
-                max_results=max_results,
-                include_answer=True,
-            )
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(self.client.search, query=query, topic=topic, max_results=max_results, include_answer=True)
+                search_response = future.result(timeout=TIMEOUT_SECONDS)
             sources = self._normalize_results(search_response.get("results", []), max_results)
 
             return ToolResult(
@@ -69,6 +68,12 @@ class WebSearchTool(BaseTool):
                 }
             )
         
+        except TimeoutError:
+            return ToolResult(
+                success= False,
+                tool_name=self.name,
+                error_message=f"Web search timed out after {TIMEOUT_SECONDS} seconds."
+            )
         except Exception as exc:
             return ToolResult(
                 success=False,

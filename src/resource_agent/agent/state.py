@@ -22,7 +22,7 @@ class AgentState:
     task: str
     status: str = "running"
 
-    steps: List[str] = field(default_factory=list)
+    steps: List[AgentStep] = field(default_factory=list)
     tool_results: List[Dict[str, Any]] = field(default_factory=list)
     replanning_events: List[str] = field(default_factory=list)
 
@@ -65,7 +65,7 @@ class AgentState:
             
             scratchpad_parts.append("\n")
 
-            return "".join(scratchpad_parts)
+        return "".join(scratchpad_parts)
     
     def mark_completed(self, final_answer: str) -> None:
         self.status = "completed"

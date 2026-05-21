@@ -3,6 +3,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from typing import Dict, Any, List
+from unittest import result
 from resource_agent.tools.base import BaseTool, ToolResult
 
 class CodeExecutionTool(BaseTool):
@@ -55,17 +56,26 @@ class CodeExecutionTool(BaseTool):
                     cwd=temp_dir,
                 )
 
+                execution_data = {
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                    "returncode": result.returncode,
+                }
+
+                if result.returncode != 0:
+                    return ToolResult(
+                        success=False,
+                        tool_name=self.name,
+                        data=execution_data,
+                        error_message=result.stderr.strip() or f"Process exited with code {result.returncode}",
+                    )
+
                 return ToolResult(
                     success=True,
                     tool_name=self.name,
-                    data={
-                        "stdout": result.stdout,
-                        "stderr": result.stderr,
-                        "returncode": result.returncode
-                    },
-                    error = result.stderr if result.returncode != 0 else None
+                    data=execution_data,
                 )
-            
+                
         
         except subprocess.TimeoutExpired:
             return ToolResult(
