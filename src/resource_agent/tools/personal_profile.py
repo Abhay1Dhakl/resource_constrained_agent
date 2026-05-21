@@ -9,15 +9,15 @@ class PersonalProfileTool(BaseTool):
                    "target role, and interview preparation focus")
     
     def __init__(self, profile_path: str = "data/personal_profile.json"):
-        self.profile_path = profile_path
+        self.profile_path = Path(profile_path)
     
     def run(self, arguments: Dict[str, Any]) -> ToolResult:
         try:
             if not self.profile_path.exists():
                 return ToolResult(
                     success = False,
-                    tool_name = self.NameError,
-                    error = f"Profile file not found: {self.profile_path}",
+                    tool_name = self.name,
+                    error_message = f"Profile file not found: {self.profile_path}",
                 )
             
             with open(self.profile_path, "r", encoding="utf-8") as file:
@@ -30,7 +30,7 @@ class PersonalProfileTool(BaseTool):
                 tool_name=self.name,
                 data={
                     "query": query,
-                    "profile": "profile"
+                    "profile": profile
                 }
             )
 
@@ -38,5 +38,5 @@ class PersonalProfileTool(BaseTool):
             return ToolResult(
                 success= False,
                 tool_name= self.name,
-                error=str(exc)
+                error_message=str(exc)
             )
