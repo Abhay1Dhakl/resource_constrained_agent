@@ -1,9 +1,9 @@
-from resource_agent.tools.personal_profile import PersonalProfile
+from resource_agent.tools.personal_profile import PersonalProfileTool
 
 class ToolRegistry:
     def __init__(self):
         self.tools = {
-            'personal_profile': PersonalProfile(),
+            'personal_profile': PersonalProfileTool(),
             # 'web_search': WebSearch(),
             # 'code_execution': CodeExecution(),
         }
