@@ -1,25 +1,58 @@
-import sys
 from resource_agent.agent.react_agent import ReactAgent
-from resource_agent.config import load_env_file
+
+
+def print_agent_result(state):
+    print("\n" + "=" * 80)
+    print("AGENT RUN RESULT")
+    print("=" * 80)
+
+    print(f"\nTask:\n{state.task}")
+
+    print(f"\nStatus: {state.status}")
+    print(f"Stop Reason: {state.stop_reason}")
+
+    print("\n" + "-" * 80)
+    print("REACT TRACE")
+    print("-" * 80)
+
+    if not state.steps:
+        print("No steps were executed.")
+    else:
+        for step in state.steps:
+            print(f"\nStep {step.step_number}")
+
+            if step.thought:
+                print(f"Thought: {step.thought}")
+
+            if step.action:
+                print(f"Action: {step.action}")
+
+            if step.action_input:
+                print(f"Action Input: {step.action_input}")
+
+            if step.observation:
+                print(f"Observation: {step.observation}")
+
+    print("\n" + "-" * 80)
+    print("FINAL ANSWER")
+    print("-" * 80)
+
+    print(state.final_answer)
+
+    print("\n" + "=" * 80)
+
 
 def main():
-    load_env_file()
+    agent = ReactAgent(max_steps=5)
 
-    # if len(sys.argv) < 2:
-    #     print("Usage: python main.py <task>")
-    #     return 
-    
-    task = "Search latest information about Cedar Gate Nepal for AI Engineer interview preparation."
-    agent = ReactAgent()
-    result = agent.run(task)
-    print("Agent State:")
-    print(f"Task: {result.task}")
-    print(f"Status: {result.status}")
-    print(f"Steps Completed: {result.steps_completed}")
-    print(f"Tool Results: {result.tool_results}")
-    print(f"Final Answer: {result.final_answer}")
-    print(f"Stop Reason: {result.stop_reason}")
-    print(f"Budget Summary: {agent.budget_summary()}")
+    task = (
+        "Prepare me for a Cedar Gate AI Engineer interview based on my profile. "
+        "Also search recent company information and give me one Python coding question to practice."
+    )
+
+    state = agent.run(task)
+
+    print_agent_result(state)
 
 
 if __name__ == "__main__":

@@ -1,198 +1,209 @@
 from typing import Any, Dict
 
-from resource_agent.budget.budget_manager import BudgetManager, BudgetExceededError
-from resource_agent.tools.registry import ToolRegistry
-from resource_agent.llm.mock_client import MockLLMClient
 from resource_agent.agent.state import AgentState
+from resource_agent.budget.budget_manager import BudgetManager
+from resource_agent.llm.mock_client import MockLLMClient
+from resource_agent.tools.registry import ToolRegistry
 
 
 class ReactAgent:
     """
-    A simple resource-constrained ReAct agent.
+    Multi-step ReAct agent.
 
     Flow:
-    1. Receive user task
-    2. Ask LLM which tool to use
-    3. Check budget
-    4. Execute selected tool
-    5. Store observation
-    6. Build final answer
+    User task
+        -> LLM decides next action
+        -> Agent checks budget
+        -> ToolRegistry runs tool
+        -> Observation is stored in AgentState
+        -> LLM sees scratchpad
+        -> Repeat until final_answer
     """
 
-    def __init__(self):
+    def __init__(self, max_steps: int = 5):
         self.llm = MockLLMClient()
         self.budget = BudgetManager(max_calls=10, max_cost=0.20)
         self.tools = ToolRegistry()
+        self.max_steps = max_steps
 
     def run(self, task: str) -> AgentState:
         state = AgentState(task=task)
 
         try:
-            # 1. Check budget before LLM call
-            if not self.budget.can_make_call():
-                state.status = "stopped"
-                state.stop_reason = "Budget exhausted before execution"
-                state.final_answer = (
-                    "Sorry, the agent stopped before starting because "
-                    "the budget was already exhausted."
+            for _ in range(self.max_steps):
+                if not self.budget.can_make_call():
+                    state.mark_stopped("Budget exhausted before LLM call")
+                    return state
+
+                scratchpad = state.get_scratchpad()
+
+                llm_response = self.llm.generate(
+                    task=task,
+                    scratchpad=scratchpad,
                 )
-                return state
 
-            # 2. Ask LLM for next action
-            llm_response = self.llm.generate(task)
+                self.budget.record_llm_call(llm_response.get("cost", 0.0))
 
-            # 3. Record LLM cost
-            self.budget.record_llm_call(llm_response["cost"])
+                decision = llm_response.get("content", {})
 
-            decision = llm_response["content"]
+                thought = decision.get("thought")
+                action = decision.get("action")
+                action_input = decision.get("action_input", {})
 
-            action = decision.get("action")
-            action_input = decision.get("action_input", {})
+                if not action:
+                    state.mark_failed("LLM did not return an action")
+                    return state
 
-            state.steps_completed.append("LLM generated an action decision.")
-            state.steps_completed.append(f"Selected tool: {action}")
+                if action == "final_answer":
+                    final_answer = decision.get("final_answer", "No final answer provided.")
+                    state.add_step(
+                        thought=thought,
+                        action=action,
+                        action_input=None,
+                        observation={
+                            "success": True,
+                            "tool_name": "final_answer",
+                            "data": {
+                                "answer": final_answer,
+                            },
+                            "error": None,
+                        },
+                    )
+                    state.mark_completed(final_answer)
+                    return state
 
-            # 4. Validate action
-            if not action:
-                state.status = "failed"
-                state.stop_reason = "LLM did not return an action."
-                state.final_answer = "The agent failed because no tool action was selected."
-                return state
+                if not self.budget.can_make_call():
+                    state.mark_stopped("Budget exhausted before tool call")
+                    return state
 
-            tool = self.tools.get_tool(action)
+                tool_result = self._run_tool(
+                    tool_name=action,
+                    tool_input=action_input,
+                )
+
+                normalized_result = self._normalize_tool_result(
+                    tool_name=action,
+                    result=tool_result,
+                )
+
+                self._record_tool_cost_if_supported()
+
+                state.add_step(
+                    thought=thought,
+                    action=action,
+                    action_input=action_input,
+                    observation=normalized_result,
+                )
+
+                if not normalized_result.get("success", False):
+                    state.mark_failed(
+                        f"Tool '{action}' failed: {normalized_result.get('error')}"
+                    )
+                    return state
+
+            state.mark_stopped(
+                f"Maximum step limit reached: {self.max_steps}"
+            )
+            return state
+
+        except Exception as e:
+            state.mark_failed(str(e))
+            return state
+
+    def _run_tool(self, tool_name: str, tool_input: Dict[str, Any]) -> Any:
+        """
+        Runs a tool through ToolRegistry.
+
+        Supports both:
+        - registry.run_tool(name, input)
+        - registry.get_tool(name).run(input)
+        """
+
+        if hasattr(self.tools, "run_tool"):
+            return self.tools.run_tool(tool_name, tool_input)
+
+        if hasattr(self.tools, "get_tool"):
+            tool = self.tools.get_tool(tool_name)
 
             if tool is None:
-                state.status = "failed"
-                state.stop_reason = f"Unknown tool requested: {action}"
-                state.final_answer = (
-                    f"The agent failed because the requested tool "
-                    f"'{action}' is not available."
-                )
-                return state
+                return {
+                    "success": False,
+                    "tool_name": tool_name,
+                    "data": {},
+                    "error": f"Tool '{tool_name}' not found",
+                }
 
-            # 5. Execute selected tool
-            tool_result = tool.run(action_input)
-
-            normalized_result = self._normalize_tool_result(tool_result)
-
-            state.steps_completed.append(f"Executed tool: {action}")
-            state.steps_completed.append(f"Tool input: {action_input}")
-            state.tool_results.append(normalized_result)
-
-            # 6. Build final answer
-            state.final_answer = self._build_final_answer(
-                tool_name=action,
-                tool_result=normalized_result,
-            )
-
-            state.status = "completed"
-            state.stop_reason = "Task completed within budget."
-
-            return state
-
-        except BudgetExceededError as error:
-            state.status = "stopped"
-            state.stop_reason = "Budget exceeded during execution"
-            state.final_answer = (
-                f"Sorry, the agent stopped because the budget was exceeded: {str(error)}"
-            )
-            return state
-
-        except Exception as error:
-            state.status = "failed"
-            state.stop_reason = "Unexpected runtime error"
-            state.final_answer = f"The agent failed due to an unexpected error: {str(error)}"
-            return state
-
-    def _normalize_tool_result(self, tool_result: Any) -> Dict[str, Any]:
-        """
-        Converts tool output into a normal dictionary.
-
-        Supports:
-        - plain dict
-        - Pydantic model with model_dump()
-        """
-
-        if hasattr(tool_result, "model_dump"):
-            normalized = tool_result.model_dump()
-            if normalized.get("error_message") and "error" not in normalized:
-                normalized["error"] = normalized["error_message"]
-            return normalized
-
-        if isinstance(tool_result, dict):
-            if tool_result.get("error_message") and "error" not in tool_result:
-                return {**tool_result, "error": tool_result["error_message"]}
-            return tool_result
+            return tool.run(tool_input)
 
         return {
             "success": False,
-            "error": "Tool returned unsupported result format.",
-            "raw_result": str(tool_result),
+            "tool_name": tool_name,
+            "data": {},
+            "error": "ToolRegistry does not support run_tool or get_tool",
         }
 
-    def _build_final_answer(self, tool_name: str, tool_result: Dict[str, Any]) -> str:
+    def _normalize_tool_result(
+        self,
+        tool_name: str,
+        result: Any,
+    ) -> Dict[str, Any]:
         """
-        Builds a generic final answer for any tool.
+        Converts tool result into a normal dictionary.
 
-        Later, you can replace this with an LLM-based final response generator.
+        This supports:
+        - plain dict
+        - Pydantic model with model_dump()
+        - older Pydantic model with dict()
         """
 
-        if not tool_result.get("success"):
-            return (
-                f"The tool '{tool_name}' failed with error: "
-                f"{tool_result.get('error', 'Unknown error')}"
-            )
+        if result is None:
+            return {
+                "success": False,
+                "tool_name": tool_name,
+                "data": {},
+                "error": "Tool returned None",
+            }
 
-        data = tool_result.get("data", {})
+        if isinstance(result, dict):
+            return {
+                "success": result.get("success", False),
+                "tool_name": result.get("tool_name", tool_name),
+                "data": result.get("data", {}),
+                "error": result.get("error"),
+            }
 
-        if tool_name == "calculator":
-            return f"The result of the calculation is: {data.get('result')}"
+        if hasattr(result, "model_dump"):
+            dumped = result.model_dump()
+            return {
+                "success": dumped.get("success", False),
+                "tool_name": dumped.get("tool_name", tool_name),
+                "data": dumped.get("data", {}),
+                "error": dumped.get("error"),
+            }
 
-        if tool_name == "personal_profile":
-            profile = data.get("profile", {})
-            target_role = profile.get("target_role", "your target role")
-            skills = profile.get("skills", {})
-            projects = profile.get("projects", [])
-            weak_areas = profile.get("weak_areas", [])
+        if hasattr(result, "dict"):
+            dumped = result.dict()
+            return {
+                "success": dumped.get("success", False),
+                "tool_name": dumped.get("tool_name", tool_name),
+                "data": dumped.get("data", {}),
+                "error": dumped.get("error"),
+            }
 
-            return (
-                f"Based on your personal profile, you are preparing for the "
-                f"{target_role} role.\n\n"
-                f"Your key skill areas are: {skills}.\n\n"
-                f"Your main projects are: {projects}.\n\n"
-                f"Your weak areas to improve are: {weak_areas}."
-            )
+        return {
+            "success": False,
+            "tool_name": tool_name,
+            "data": {},
+            "error": f"Unsupported tool result type: {type(result)}",
+        }
 
-        if tool_name == "web_search":
-            answer = data.get("answer")
-            sources = data.get("sources", [])
+    def _record_tool_cost_if_supported(self) -> None:
+        """
+        Records a tool call if BudgetManager supports it.
 
-            source_lines = []
+        This keeps the agent compatible with your current BudgetManager
+        even if it only has record_llm_call().
+        """
 
-            for index, source in enumerate(sources, start=1):
-                source_lines.append(
-                    f"{index}. {source.get('title')}\n"
-                    f"URL: {source.get('url')}\n"
-                    f"Summary: {source.get('content')}"
-                )
-
-            return (
-                "Web search completed.\n\n"
-                f"Search answer:\n{answer if answer else 'No direct answer returned.'}\n\n"
-                "Sources:\n"
-                + "\n\n".join(source_lines)
-            )
-
-        if tool_name == "code_execution":
-            stdout = data.get("stdout", "")
-            stderr = data.get("stderr", "")
-            return (
-                "Code execution completed.\n\n"
-                f"Output:\n{stdout}\n\n"
-                f"Errors:\n{stderr if stderr else 'No errors.'}"
-            )
-
-        return f"Tool '{tool_name}' executed successfully. Result:\n\n{data}"
-
-    def budget_summary(self) -> dict:
-        return self.budget.summary()
+        if hasattr(self.budget, "record_tool_call"):
+            self.budget.record_tool_call()
