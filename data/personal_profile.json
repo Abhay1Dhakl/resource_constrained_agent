@@ -1,0 +1,59 @@
+{
+  "name": "Aman",
+  "target_role": "AI Engineer",
+  "target_companies": ["Jobins", "Cedar Gate"],
+  "skills": {
+    "programming": ["Python", "SQL"],
+    "ai_ml": ["Machine Learning", "NLP", "RAG", "LLM Applications", "Embeddings"],
+    "backend": ["FastAPI", "Docker", "Redis"],
+    "tools": ["Git", "OpenAI API", "Pinecone"]
+  },
+  "projects": [
+    {
+      "name": "SQL Agent",
+      "description": "AI agent that converts natural language questions into safe SQL queries.",
+      "topics": [
+        "NL2SQL",
+        "SQL validation",
+        "SQL injection prevention",
+        "read-only execution"
+      ]
+    },
+    {
+      "name": "RAG Chatbot",
+      "description": "Retrieval-augmented generation system for answering questions from documents.",
+      "topics": [
+        "embeddings",
+        "vector database",
+        "chunking",
+        "retrieval",
+        "LLM response generation"
+      ]
+    },
+    {
+      "name": "Job Data Retrieval System",
+      "description": "RAG-based job search assistant using job listing data.",
+      "topics": [
+        "hybrid search",
+        "BM25",
+        "semantic search",
+        "Redis caching",
+        "FastAPI"
+      ]
+    }
+  ],
+  "weak_areas": [
+    "DSA speed",
+    "system design explanation",
+    "production monitoring",
+    "ML evaluation metrics"
+  ],
+  "interview_focus": [
+    "Python",
+    "OOP",
+    "AI/ML basics",
+    "RAG",
+    "SQL agent security",
+    "production deployment"
+  ]
+}
