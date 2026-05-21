@@ -1,17 +1,47 @@
 class MockLLMClient:
-    """A mock LLM client for testing purposes."""
-
-    def __init__(self, mock_cost_per_call: float = 0.02):
-        self.mock_cost_per_call = mock_cost_per_call
-    
     def generate(self, task: str) -> dict:
+        task_lower = task.lower()
+
+        if "run code" in task_lower or "execute code" in task_lower or "python" in task_lower:
+            return {
+                "cost": 0.01,
+                "content": {
+                    "action": "code_execution",
+                    "action_input": {
+                        "language": "python",
+                        "code": """
+def two_sum(nums, target):
+    seen = {}
+    for i, num in enumerate(nums):
+        diff = target - num
+        if diff in seen:
+            return [seen[diff], i]
+        seen[num] = i
+    return []
+
+print(two_sum([2, 7, 11, 15], 9))
+"""
+                    }
+                }
+            }
+
+        if "profile" in task_lower or "interview" in task_lower or "prepare me" in task_lower:
+            return {
+                "cost": 0.01,
+                "content": {
+                    "action": "personal_profile",
+                    "action_input": {
+                        "query": task
+                    }
+                }
+            }
+
         return {
-            "content" : {
-                "thought": "The user is asking for a simple calculator",
+            "cost": 0.01,
+            "content": {
                 "action": "calculator",
-                "action_input": "2 + 2"
-            },
-            "cost": self.mock_cost_per_call,
-            "input_tokens": 100,
-            "output_tokens": 50,
+                "action_input": {
+                    "expression": "2 + 2"
+                }
+            }
         }

@@ -1,11 +1,12 @@
 from resource_agent.tools.personal_profile import PersonalProfileTool
+from resource_agent.tools.code_execution import CodeExecutionTool
 
 class ToolRegistry:
     def __init__(self):
         self.tools = {
             'personal_profile': PersonalProfileTool(),
             # 'web_search': WebSearch(),
-            # 'code_execution': CodeExecution(),
+            'code_execution': CodeExecutionTool(),
         }
 
     def get_tool(self, tool_name: str):

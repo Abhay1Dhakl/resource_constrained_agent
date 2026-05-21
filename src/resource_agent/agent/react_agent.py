@@ -162,7 +162,13 @@ class ReactAgent:
             return f"Here are the web search results:\n\n{data}"
 
         if tool_name == "code_execution":
-            return f"Code execution result:\n\n{data}"
+            stdout = data.get("stdout", "")
+            stderr = data.get("stderr", "")
+            return (
+                "Code execution completed.\n\n"
+                f"Output:\n{stdout}\n\n"
+                f"Errors:\n{stderr if stderr else 'No errors.'}"
+            )
 
         return f"Tool '{tool_name}' executed successfully. Result:\n\n{data}"
 
