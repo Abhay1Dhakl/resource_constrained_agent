@@ -2,7 +2,7 @@ from typing import Any, Dict
 
 from resource_agent.agent.state import AgentState
 from resource_agent.budget.budget_manager import BudgetManager
-from resource_agent.llm.mock_client import MockLLMClient
+from resource_agent.llm import build_llm_client
 from resource_agent.tools.registry import ToolRegistry
 
 
@@ -25,8 +25,9 @@ class ReactAgent:
         max_steps: int = 5,
         max_calls: int = 10,
         max_cost: float = 0.20,
+        llm=None,
     ):
-        self.llm = MockLLMClient()
+        self.llm = llm or build_llm_client()
         self.budget = BudgetManager(max_calls=max_calls, max_cost=max_cost)
         self.tools = ToolRegistry()
         self.max_steps = max_steps
@@ -49,6 +50,8 @@ class ReactAgent:
                     llm_response = self.llm.generate(
                         task=task,
                         scratchpad=scratchpad,
+                        budget_summary=self.budget.summary(),
+                        tools=self.tools.list_tools(),
                     )
 
                     self.budget.record_llm_call(llm_response.get("cost", 0.0))
@@ -103,13 +106,6 @@ class ReactAgent:
                     observation=normalized_result,
                 )
 
-                if not normalized_result.get("success", False):
-                    error_text = normalized_result.get("error") or "Unknown error"
-                    state.mark_failed(
-                        f"Tool '{action}' failed: {error_text}"
-                    )
-                    return state
-
                 ## Revise this properly later
                 reflection = self._reflect_on_progress(action, action_input, normalized_result)
 
@@ -131,6 +127,13 @@ class ReactAgent:
                 if replan and failure_counts[signature] == 1:
                     pending_replan = replan
                     continue
+
+                if not normalized_result.get("success", False):
+                    error_text = normalized_result.get("error") or "Unknown error"
+                    state.mark_failed(
+                        f"Tool '{action}' failed: {error_text}"
+                    )
+                    return state
 
             state.mark_stopped(
                 f"Maximum step limit reached: {self.max_steps}"

@@ -25,6 +25,8 @@ class MockLLMClient:
         self,
         task: str,
         scratchpad: Optional[str] = None,
+        budget_summary: Optional[Dict[str, Any]] = None,
+        tools: Optional[list[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
         scratchpad = scratchpad or ""
 
