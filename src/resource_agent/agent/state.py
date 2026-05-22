@@ -24,7 +24,7 @@ class AgentState:
 
     steps: List[AgentStep] = field(default_factory=list)
     tool_results: List[Dict[str, Any]] = field(default_factory=list)
-    replanning_events: List[str] = field(default_factory=list)
+    replanning_events: List[Dict[str, Any]] = field(default_factory=list)
 
     final_answer: Optional[str] = None
     stop_reason: Optional[str]  = None
@@ -81,3 +81,13 @@ class AgentState:
         self.status = "stopped"
         self.final_answer = f"The agent stopped because: {reason}"
         self.stop_reason = reason
+    
+    def add_replanning_event(self, step_number: int, action: str, reason: str, next_action: Optional[str]) -> None:
+        self.replanning_events.append(
+            {
+                "step_number": step_number,
+                "failed_action": action,
+                "reason": reason,
+                "next_action": next_action,
+            }
+        )

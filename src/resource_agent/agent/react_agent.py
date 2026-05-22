@@ -20,31 +20,39 @@ class ReactAgent:
         -> Repeat until final_answer
     """
 
-    def __init__(self, max_steps: int = 5):
+    def __init__(
+        self,
+        max_steps: int = 5,
+        max_calls: int = 10,
+        max_cost: float = 0.20,
+    ):
         self.llm = MockLLMClient()
-        self.budget = BudgetManager(max_calls=10, max_cost=0.20)
+        self.budget = BudgetManager(max_calls=max_calls, max_cost=max_cost)
         self.tools = ToolRegistry()
         self.max_steps = max_steps
 
     def run(self, task: str) -> AgentState:
         state = AgentState(task=task)
-
+        pending_replan: Dict[str, Any] | None = None
+        failure_counts: Dict[str, int] = {}
         try:
             for _ in range(self.max_steps):
                 if not self.budget.can_make_call():
                     state.mark_stopped("Budget exhausted before LLM call")
                     return state
 
-                scratchpad = state.get_scratchpad()
+                if pending_replan is not None:
+                    decision = pending_replan
+                    pending_replan = None
+                else:
+                    scratchpad = state.get_scratchpad()
+                    llm_response = self.llm.generate(
+                        task=task,
+                        scratchpad=scratchpad,
+                    )
 
-                llm_response = self.llm.generate(
-                    task=task,
-                    scratchpad=scratchpad,
-                )
-
-                self.budget.record_llm_call(llm_response.get("cost", 0.0))
-
-                decision = llm_response.get("content", {})
+                    self.budget.record_llm_call(llm_response.get("cost", 0.0))
+                    decision = llm_response.get("content", {})
 
                 thought = decision.get("thought")
                 action = decision.get("action")
@@ -101,6 +109,28 @@ class ReactAgent:
                         f"Tool '{action}' failed: {error_text}"
                     )
                     return state
+
+                ## Revise this properly later
+                reflection = self._reflect_on_progress(action, action_input, normalized_result)
+
+                if reflection["progress"]:
+                    continue
+
+                reason = reflection["reason"]
+                signature = f"{action}|{reason}"
+                failure_counts[signature] = failure_counts.get(signature, 0) + 1
+
+                replan = reflection.get("replan")
+                state.add_replanning_event(
+                    step_number=len(state.steps),
+                    action=action,
+                    reason=reason,
+                    next_action=replan["action"] if replan else None,
+                )
+
+                if replan and failure_counts[signature] == 1:
+                    pending_replan = replan
+                    continue
 
             state.mark_stopped(
                 f"Maximum step limit reached: {self.max_steps}"
@@ -202,3 +232,36 @@ class ReactAgent:
 
         if hasattr(self.budget, "record_tool_call"):
             self.budget.record_tool_call()
+
+    def budget_summary(self) -> Dict[str, Any]:
+        return self.budget.summary()
+    
+
+    def _reflect_on_progress(self, action: str, action_input: Dict[str, Any], obs: Dict[str, Any],) -> Dict[str, Any]:
+        if obs.get("success"):
+            return {
+                "progress": True,
+                "reason": f"{action} succeeded",
+                "replan": None,
+            }
+
+        error_text = obs.get("error") or "unknown tool failure"
+
+        if action == "web_search" and "Invalid topic" in error_text:
+            fixed_input = dict(action_input or {})
+            fixed_input["topic"] = "general"
+            return {
+                "progress": False,
+                "reason": error_text,
+                "replan": {
+                    "thought": "Web search failed due to invalid topic. Retry with topic='general'.",
+                    "action": "web_search",
+                    "action_input": fixed_input,
+                },
+            }
+
+        return {
+            "progress": False,
+            "reason": error_text,
+            "replan": None,
+        }

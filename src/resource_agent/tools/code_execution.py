@@ -1,9 +1,9 @@
 import ast
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Dict, Any, List
-from unittest import result
 from resource_agent.tools.base import BaseTool, ToolResult
 
 class CodeExecutionTool(BaseTool):
@@ -49,7 +49,7 @@ class CodeExecutionTool(BaseTool):
                 file_path.write_text(code, encoding="utf-8")
 
                 result = subprocess.run(
-                    ["python", str(file_path)],
+                    [sys.executable, str(file_path)],
                     capture_output=True,
                     text=True,
                     timeout=timeout,
