@@ -34,43 +34,39 @@ class ReactAgent:
 
     def run(self, task: str) -> AgentState:
         state = AgentState(task=task)
-        pending_replan: Dict[str, Any] | None = None
-        failure_counts: Dict[str, int] = {}
         try:
             for _ in range(self.max_steps):
                 if not self.budget.can_make_call():
                     state.mark_stopped("Budget exhausted before LLM call")
                     return state
 
-                if pending_replan is not None:
-                    decision = pending_replan
-                    pending_replan = None
-                else:
-                    scratchpad = state.get_scratchpad()
-                    llm_response = self.llm.generate(
-                        task=task,
-                        scratchpad=scratchpad,
-                        budget_summary=self.budget.summary(),
-                        tools=self.tools.list_tools(),
-                    )
+                scratchpad = state.get_scratchpad()
+                llm_response = self.llm.generate(
+                    task=task,
+                    scratchpad=scratchpad,
+                    budget_summary=self.budget.summary(),
+                    tools=self.tools.list_tools(),
+                )
 
-                    self.budget.record_llm_call(llm_response.get("cost", 0.0))
-                    decision = llm_response.get("content", {})
+                self.budget.record_llm_call(llm_response.get("cost", 0.0))
+                decision = llm_response.get("content", {})
 
                 thought = decision.get("thought")
                 action = decision.get("action")
-                action_input = decision.get("action_input", {})
+                action_input = decision.get("action_input") or {}
+                status = decision.get("status")
+                reason = decision.get("reason", "")
 
-                if not action:
-                    state.mark_failed("LLM did not return an action")
-                    return state
-
-                if action == "final_answer":
-                    final_answer = decision.get("final_answer", "No final answer provided.")
+                if status == "final_answer":
+                    final_answer = (
+                        decision.get("final_answer")
+                        or reason
+                        or "No final answer provided."
+                    )
                     state.add_step(
                         thought=thought,
                         action=action,
-                        action_input=None,
+                        action_input=action_input,
                         observation={
                             "success": True,
                             "tool_name": "final_answer",
@@ -82,6 +78,29 @@ class ReactAgent:
                     )
                     state.mark_completed(final_answer)
                     return state
+                
+                if status == "stop":
+                    stop_message = (
+                        decision.get("final_answer")
+                        or reason
+                        or "Planner chose to stop"
+                    )
+                    state.mark_stopped(stop_message)
+                    return state
+
+                if status not in {"continue", "replan"}:
+                    state.mark_failed(f"Invalid status from LLM: {status}")
+                    return state
+                if not action:
+                    state.mark_failed("Planner did not return an action")
+                    return state
+
+                if status == "replan" and state.steps:
+                    state.add_replanning_event(
+                        step_number = len(state.steps),
+                        action = state.steps[-1].action or "unknown",
+                        reason = reason,
+                        next_action = action, )
 
                 if not self.budget.can_make_call():
                     state.mark_stopped("Budget exhausted before tool call")
@@ -105,35 +124,6 @@ class ReactAgent:
                     action_input=action_input,
                     observation=normalized_result,
                 )
-
-                ## Revise this properly later
-                reflection = self._reflect_on_progress(action, action_input, normalized_result)
-
-                if reflection["progress"]:
-                    continue
-
-                reason = reflection["reason"]
-                signature = f"{action}|{reason}"
-                failure_counts[signature] = failure_counts.get(signature, 0) + 1
-
-                replan = reflection.get("replan")
-                state.add_replanning_event(
-                    step_number=len(state.steps),
-                    action=action,
-                    reason=reason,
-                    next_action=replan["action"] if replan else None,
-                )
-
-                if replan and failure_counts[signature] == 1:
-                    pending_replan = replan
-                    continue
-
-                if not normalized_result.get("success", False):
-                    error_text = normalized_result.get("error") or "Unknown error"
-                    state.mark_failed(
-                        f"Tool '{action}' failed: {error_text}"
-                    )
-                    return state
 
             state.mark_stopped(
                 f"Maximum step limit reached: {self.max_steps}"
@@ -240,31 +230,31 @@ class ReactAgent:
         return self.budget.summary()
     
 
-    def _reflect_on_progress(self, action: str, action_input: Dict[str, Any], obs: Dict[str, Any],) -> Dict[str, Any]:
-        if obs.get("success"):
-            return {
-                "progress": True,
-                "reason": f"{action} succeeded",
-                "replan": None,
-            }
+    # def _reflect_on_progress(self, action: str, action_input: Dict[str, Any], obs: Dict[str, Any],) -> Dict[str, Any]:
+    #     if obs.get("success"):
+    #         return {
+    #             "progress": True,
+    #             "reason": f"{action} succeeded",
+    #             "replan": None,
+    #         }
 
-        error_text = obs.get("error") or "unknown tool failure"
+    #     error_text = obs.get("error") or "unknown tool failure"
 
-        if action == "web_search" and "Invalid topic" in error_text:
-            fixed_input = dict(action_input or {})
-            fixed_input["topic"] = "general"
-            return {
-                "progress": False,
-                "reason": error_text,
-                "replan": {
-                    "thought": "Web search failed due to invalid topic. Retry with topic='general'.",
-                    "action": "web_search",
-                    "action_input": fixed_input,
-                },
-            }
+    #     if action == "web_search" and "Invalid topic" in error_text:
+    #         fixed_input = dict(action_input or {})
+    #         fixed_input["topic"] = "general"
+    #         return {
+    #             "progress": False,
+    #             "reason": error_text,
+    #             "replan": {
+    #                 "thought": "Web search failed due to invalid topic. Retry with topic='general'.",
+    #                 "action": "web_search",
+    #                 "action_input": fixed_input,
+    #             },
+    #         }
 
-        return {
-            "progress": False,
-            "reason": error_text,
-            "replan": None,
-        }
+    #     return {
+    #         "progress": False,
+    #         "reason": error_text,
+    #         "replan": None,
+    #     }

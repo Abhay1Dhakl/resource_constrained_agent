@@ -1,50 +1,9 @@
-import json
 import os
+import json
 from typing import Any, Dict, List, Optional
 
 from resource_agent.config import load_env_file
-
-
-DECISION_SCHEMA: Dict[str, Any] = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": {
-        "thought": {"type": "string"},
-        "progress_assessment": {
-            "type": "string",
-            "enum": [
-                "progress",
-                "partial_progress",
-                "no_progress",
-                "blocked",
-                "enough_information",
-            ],
-        },
-        "reason": {"type": "string"},
-        "status": {
-            "type": "string",
-            "enum": ["continue", "replan", "final_answer", "stop"],
-        },
-        "action": {
-            "anyOf": [{"type": "string"}, {"type": "null"}],
-        },
-        "action_input": {
-            "anyOf": [{"type": "object"}, {"type": "null"}],
-        },
-        "final_answer": {
-            "anyOf": [{"type": "string"}, {"type": "null"}],
-        },
-    },
-    "required": [
-        "thought",
-        "progress_assessment",
-        "reason",
-        "status",
-        "action",
-        "action_input",
-        "final_answer",
-    ],
-}
+from resource_agent.llm.schemas import AgentDecision
 
 
 class OpenAILLMClient:
@@ -111,22 +70,17 @@ class OpenAILLMClient:
             budget_summary=budget_summary,
         )
 
-        response = self.client.responses.create(
+        response = self.client.responses.parse(
             model=self.model,
             instructions=instructions,
             input=user_input,
             reasoning={"effort": self.reasoning_effort},
-            text={
-                "format": {
-                    "type": "json_schema",
-                    "name": "agent_decision",
-                    "strict": True,
-                    "schema": DECISION_SCHEMA,
-                }
-            },
+            text_format=AgentDecision,
         )
 
-        parsed = json.loads(response.output_text)
+        parsed = response.output_parsed
+        if parsed is None:
+            raise ValueError("OpenAI returned no parsed planner decision.")
 
         return {
             "content": self._normalize_decision(parsed),
@@ -176,37 +130,19 @@ class OpenAILLMClient:
             "Return only the structured decision."
         )
 
-    def _normalize_decision(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Map the richer planner output into the current agent shape.
-
-        This keeps the first integration step narrow while letting us teach the
-        richer schema now and refactor the agent loop afterward.
-        """
-
-        status = payload["status"]
-
-        if status == "final_answer":
-            return {
-                "thought": payload["thought"],
-                "action": "final_answer",
-                "final_answer": payload["final_answer"] or payload["reason"],
-                "meta": payload,
-            }
-
-        if status == "stop":
-            return {
-                "thought": payload["thought"],
-                "action": "final_answer",
-                "final_answer": payload["final_answer"] or payload["reason"],
-                "meta": payload,
-            }
-
+    def _normalize_decision(self, payload: AgentDecision) -> Dict[str, Any]:
         return {
-            "thought": payload["thought"],
-            "action": payload["action"],
-            "action_input": payload["action_input"] or {},
-            "meta": payload,
+            "thought": payload.thought,
+            "progress_assessment": payload.progress_assessment,
+            "reason": payload.reason,
+            "status": payload.status,
+            "action": payload.action,
+            "action_input": (
+                payload.action_input.model_dump(exclude_none=True)
+                if payload.action_input is not None
+                else {}
+            ),
+            "final_answer": payload.final_answer,
         }
 
     def _extract_usage(self, response: Any) -> Dict[str, Any]:

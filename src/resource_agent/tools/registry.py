@@ -4,10 +4,14 @@ from resource_agent.tools.web_search import WebSearchTool
 
 class ToolRegistry:
     def __init__(self):
+        personal_profile = PersonalProfileTool()
+        web_search = WebSearchTool()
+        code_execution = CodeExecutionTool()
+
         self.tools = {
-            'personal_profile': PersonalProfileTool(),
-            'web_search': WebSearchTool(),
-            'code_execution': CodeExecutionTool(),
+            personal_profile.name: personal_profile,
+            web_search.name: web_search,
+            code_execution.name: code_execution,
         }
 
     def get_tool(self, tool_name: str):
