@@ -6,6 +6,9 @@ from pathlib import Path
 from typing import Dict, Any, List
 from resource_agent.tools.base import BaseTool, ToolResult
 
+DEFAULT_TIMEOUT_SECONDS = 5
+MAX_TIMEOUT_SECONDS = 10
+
 class CodeExecutionTool(BaseTool):
     name = "code_execution_tool"
     description = ("This tool executes Python code snippets in a secure, sandboxed environment. "
@@ -18,7 +21,21 @@ class CodeExecutionTool(BaseTool):
     def run(self, arguments: Dict[str, Any]) ->ToolResult:
         code = arguments.get("code", "")
         language = arguments.get("language", "python")
-        timeout = arguments.get("timeout", 5)
+        timeout = arguments.get("timeout", DEFAULT_TIMEOUT_SECONDS)
+
+        if not isinstance(timeout, int):
+            return ToolResult(
+                success=False,
+                tool_name=self.name,
+                error_message="Timeout must be an integer number of seconds.",
+            )
+
+        if timeout < 1 or timeout > MAX_TIMEOUT_SECONDS:
+            return ToolResult(
+                success=False,
+                tool_name=self.name,
+                error_message=f"Timeout must be between 1 and {MAX_TIMEOUT_SECONDS} seconds.",
+            )
 
         if not code:
             return ToolResult(

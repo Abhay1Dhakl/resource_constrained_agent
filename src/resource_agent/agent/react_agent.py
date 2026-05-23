@@ -1,7 +1,7 @@
 from typing import Any, Dict
 
 from resource_agent.agent.state import AgentState
-from resource_agent.budget.budget_manager import BudgetManager
+from resource_agent.budget.budget_manager import BudgetExceededError, BudgetManager
 from resource_agent.llm import build_llm_client
 from resource_agent.tools.registry import ToolRegistry
 
@@ -48,7 +48,12 @@ class ReactAgent:
                     tools=self.tools.list_tools(),
                 )
 
-                self.budget.record_llm_call(llm_response.get("cost", 0.0))
+                try:
+                    self.budget.record_llm_call(llm_response.get("cost", 0.0))
+                except BudgetExceededError as ex:
+                    state.mark_stopped(str(ex))
+                    return state
+                
                 decision = llm_response.get("content", {})
 
                 thought = decision.get("thought")
@@ -56,6 +61,7 @@ class ReactAgent:
                 action_input = decision.get("action_input") or {}
                 status = decision.get("status")
                 reason = decision.get("reason", "")
+                progress_assessment = decision.get("progress_assessment")
 
                 if status == "final_answer":
                     final_answer = (
@@ -75,6 +81,7 @@ class ReactAgent:
                             },
                             "error": None,
                         },
+                        progress_assessment=progress_assessment,
                     )
                     state.mark_completed(final_answer)
                     return state
@@ -95,16 +102,6 @@ class ReactAgent:
                     state.mark_failed("Planner did not return an action")
                     return state
 
-                if status == "replan" and state.steps:
-                    state.add_replanning_event(
-                        step_number = len(state.steps),
-                        action = state.steps[-1].action or "unknown",
-                        reason = reason,
-                        next_action = action, )
-
-                if not self.budget.can_make_call():
-                    state.mark_stopped("Budget exhausted before tool call")
-                    return state
 
                 tool_result = self._run_tool(
                     tool_name=action,
@@ -116,14 +113,21 @@ class ReactAgent:
                     result=tool_result,
                 )
 
-                self._record_tool_cost_if_supported()
-
                 state.add_step(
                     thought=thought,
                     action=action,
                     action_input=action_input,
                     observation=normalized_result,
+                    progress_assessment=progress_assessment,
                 )
+
+                if status == "replan" and not normalized_result.get("success", False):
+                    state.add_replanning_event(
+                        step_number=state.steps[-1].step_number,
+                        action=action,
+                        reason=reason or normalized_result.get("error") or "Tool failed",
+                        next_action=action,
+                    )
 
             state.mark_stopped(
                 f"Maximum step limit reached: {self.max_steps}"
@@ -215,46 +219,6 @@ class ReactAgent:
             "error": f"Unsupported tool result type: {type(result)}",
         }
 
-    def _record_tool_cost_if_supported(self) -> None:
-        """
-        Records a tool call if BudgetManager supports it.
-
-        This keeps the agent compatible with your current BudgetManager
-        even if it only has record_llm_call().
-        """
-
-        if hasattr(self.budget, "record_tool_call"):
-            self.budget.record_tool_call()
-
     def budget_summary(self) -> Dict[str, Any]:
         return self.budget.summary()
     
-
-    # def _reflect_on_progress(self, action: str, action_input: Dict[str, Any], obs: Dict[str, Any],) -> Dict[str, Any]:
-    #     if obs.get("success"):
-    #         return {
-    #             "progress": True,
-    #             "reason": f"{action} succeeded",
-    #             "replan": None,
-    #         }
-
-    #     error_text = obs.get("error") or "unknown tool failure"
-
-    #     if action == "web_search" and "Invalid topic" in error_text:
-    #         fixed_input = dict(action_input or {})
-    #         fixed_input["topic"] = "general"
-    #         return {
-    #             "progress": False,
-    #             "reason": error_text,
-    #             "replan": {
-    #                 "thought": "Web search failed due to invalid topic. Retry with topic='general'.",
-    #                 "action": "web_search",
-    #                 "action_input": fixed_input,
-    #             },
-    #         }
-
-    #     return {
-    #         "progress": False,
-    #         "reason": error_text,
-    #         "replan": None,
-    #     }

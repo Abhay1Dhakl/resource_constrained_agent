@@ -10,6 +10,9 @@ except ImportError:
     TavilyClient = None
 
 TIMEOUT_SECONDS = 10
+DEFAULT_MAX_RESULTS = 5
+MAX_MAX_RESULTS = 10
+ALLOWED_TOPICS = {"general", "news"}
 class WebSearchTool(BaseTool):
     name = "web_search_tool"
     description = ("Searches the web for information based on a query. It accepts a search query as input and returns relevant search results."
@@ -27,9 +30,29 @@ class WebSearchTool(BaseTool):
     
     def run(self, arguments: Dict[str, Any]) -> ToolResult:
         query = arguments.get("query")
-        max_results = arguments.get("max_results", 5)
+        max_results = arguments.get("max_results", DEFAULT_MAX_RESULTS)
         topic = arguments.get("topic")
+        
+        if not isinstance(max_results, int):
+            return ToolResult(
+                success=False,
+                tool_name=self.name,
+                error_message="max_results must be an integer.",
+            )
 
+        if max_results < 1 or max_results > MAX_MAX_RESULTS:
+            return ToolResult(
+                success=False,
+                tool_name=self.name,
+                error_message=f"max_results must be between 1 and {MAX_MAX_RESULTS}.",
+            )
+        
+        if topic is not None and topic not in ALLOWED_TOPICS:
+            return ToolResult(
+                success=False,
+                tool_name=self.name,
+                error_message=f"topic must be one of: {sorted(ALLOWED_TOPICS)}.",
+            )
         if not query:
             return ToolResult(
                 success=False,

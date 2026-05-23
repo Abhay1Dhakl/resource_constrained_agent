@@ -3,6 +3,12 @@ class BudgetExceededError(Exception):
     pass
 
 class BudgetManager:
+    """Tracks the hard assignment budget for LLM usage only.
+
+    - calls_used counts LLM calls
+    - total_cost tracks LLM cost
+    - tool invocations do not count toward the 10-call limit"""
+    
     def __init__(self, max_calls: int = 10, max_cost: float = 0.20):
         self.max_calls = max_calls
         self.max_cost = max_cost

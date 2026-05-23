@@ -13,6 +13,7 @@ class AgentStep:
     action: Optional[str] = None
     action_input: Optional[Dict[str, Any]] = None
     observation: Optional[Dict[str, Any]] = None
+    progress_assessment: Optional[str] = None
 
 
 @dataclass
@@ -29,7 +30,7 @@ class AgentState:
     final_answer: Optional[str] = None
     stop_reason: Optional[str]  = None
 
-    def add_step(self, thought: str, action: str, action_input: Dict[str, Any], observation: Dict[str, Any]) -> None:
+    def add_step(self, thought: str, action: str, action_input: Dict[str, Any], observation: Dict[str, Any], progress_assessment: Optional[str] = None) -> None:
         step_number = len(self.steps) + 1
         step = AgentStep(
             step_number=step_number,
@@ -37,6 +38,7 @@ class AgentState:
             action=action,
             action_input=action_input,
             observation=observation,
+            progress_assessment=progress_assessment,
         )
         self.steps.append(step)
     
@@ -53,6 +55,9 @@ class AgentState:
 
             if step.thought:
                 scratchpad_parts.append(f"Thought: {step.thought}\n")
+
+            if step.progress_assessment:
+                scratchpad_parts.append(f"Progress Assessment: {step.progress_assessment}\n" )
 
             if step.action:
                 scratchpad_parts.append(f"Action: {step.action}\n")

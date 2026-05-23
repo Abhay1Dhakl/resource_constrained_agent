@@ -2,6 +2,9 @@ import json
 from typing import Dict, Any
 from pathlib import Path
 from resource_agent.tools.base import BaseTool, ToolResult
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
+
+TIMEOUT_SECONDS = 3
 
 class PersonalProfileTool(BaseTool):
     name = "personal_profile_tool"
@@ -20,8 +23,9 @@ class PersonalProfileTool(BaseTool):
                     error_message = f"Profile file not found: {self.profile_path}",
                 )
             
-            with open(self.profile_path, "r", encoding="utf-8") as file:
-                profile = json.load(file)
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(self._load_profile)
+                profile = future.result(timeout=TIMEOUT_SECONDS)
 
             query = arguments.get("query", "")
 
@@ -34,9 +38,19 @@ class PersonalProfileTool(BaseTool):
                 }
             )
 
+        except TimeoutError:
+            return ToolResult(
+                success = False,
+                tool_name = self.name,
+                error_message = f"Profile loading timed out after {TIMEOUT_SECONDS} seconds",
+            )
         except Exception as exc:
             return ToolResult(
                 success= False,
                 tool_name= self.name,
                 error_message=str(exc)
             )
+
+    def _load_profile(self) -> Dict[str, Any]:
+        with self.profile_path.open("r", encoding="utf-8") as file:
+            return json.load(file)
