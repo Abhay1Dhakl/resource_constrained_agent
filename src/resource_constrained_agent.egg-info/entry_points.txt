@@ -1,0 +1,2 @@
+[console_scripts]
+resource-agent = resource_agent.main:main
