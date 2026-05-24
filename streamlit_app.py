@@ -111,7 +111,7 @@ def render_result(result: dict) -> None:
 
 st.title("Resource-Constrained Agent")
 st.caption(
-    "Run the agent in a browser, inspect the full ReAct trace, and share a demo URL."
+    "This is a demo of a ReAct agent that operates under configurable resource constraints. "
 )
 
 templates = build_template_map()
