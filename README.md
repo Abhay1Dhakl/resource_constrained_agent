@@ -51,10 +51,10 @@ python -m pip install -r requirements.txt
 streamlit run streamlit_app.py
 ```
 
-The app will open locally in your browser and lets you enter a task, upload a
-PDF resume and convert it into the expected profile JSON, or edit/upload the
-profile JSON directly for the current session, then run the agent and inspect
-the full trace and budget summary.
+The app will open locally in your browser and provides a demo personal profile
+by default. You can also upload a PDF resume and convert it into the expected
+profile JSON, or edit/upload the profile JSON directly for the current session,
+then run the agent and inspect the full trace and budget summary.
 
 ### Docker Run
 
@@ -161,7 +161,7 @@ See also:
 - `decisions.md`
 - `test_results.md`
 
-## Deploy A Demo URL
+## Streamlit Deployment Process
 
 The repository now includes `streamlit_app.py`, which is the fastest path to a
 shareable public demo.
@@ -172,10 +172,24 @@ Recommended path:
 2. In Streamlit Community Cloud, create a new app from the repo.
 3. Set the entrypoint file to `streamlit_app.py`.
 4. Add `OPENAI_API_KEY` and, if you want live web search, `TAVILY_API_KEY` in
-   the app secrets.
+   the app secrets as root-level TOML entries, for example:
+
+   ```toml
+   OPENAI_API_KEY = "your-openai-key"
+   TAVILY_API_KEY = "your-tavily-key"
+   ```
+
 5. Deploy and use the generated `*.streamlit.app` URL as your demo link.
 6. In the app UI, upload a PDF resume to convert it into profile JSON, or
    replace the default profile JSON manually for that session.
 
 If you do not provide `TAVILY_API_KEY`, the app still runs, but search-heavy
 tasks may stop early or return partial results.
+
+The Streamlit PDF flow has two practical caveats:
+
+- Converting a PDF resume into profile JSON uses one additional OpenAI call
+  before the agent run, and that conversion call is not counted inside the
+  agent's 10-call / $0.20 task budget.
+- The PDF converter works best on text-based PDFs. Scanned image-only resumes
+  may fail if no readable text can be extracted.
