@@ -16,7 +16,7 @@ EVALUATION_TASKS = [
         task_id="interview_prep",
         name="Interview prep with recent company research",
         prompt=(
-            "Prepare me for a Cedar Gate AI Engineer interview based on my profile. "
+            "Prepare me for a Jobins Engineer interview based on my profile. "
             "Also search recent company information and give me one Python coding question to practice."
         ),
         category="normal",
