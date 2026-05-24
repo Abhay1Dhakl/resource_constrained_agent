@@ -10,9 +10,19 @@ DEFAULT_TIMEOUT_SECONDS = 5
 MAX_TIMEOUT_SECONDS = 10
 
 class CodeExecutionTool(BaseTool):
+    """
+    Executes Python snippets in a temporary working directory with
+    basic AST-based safety checks and a hard timeout.
+
+    This is a restricted execution helper, not a true security sandbox.
+    """
+
     name = "code_execution_tool"
-    description = ("This tool executes Python code snippets in a secure, sandboxed environment. "
-                     "It accepts a code snippet as input and returns the output or any error messages.")
+    description = (
+        "Executes Python code snippets in a temporary subprocess with basic "
+        "AST-based restrictions and a hard timeout. Returns stdout, stderr, "
+        "and the exit status."
+    )
     
     blocked_imports = {"os", "sys", "subprocess", "shutil", "socket", "requests", "urllib", "http"}
 
