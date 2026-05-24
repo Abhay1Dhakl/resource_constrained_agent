@@ -92,6 +92,20 @@ class ReactAgent:
                         or reason
                         or "Planner chose to stop"
                     )
+                    state.add_step(
+                            thought=thought,
+                            action=None,
+                            action_input=action_input,
+                            observation={
+                                "success": True,
+                                "tool_name": "planner_stop",
+                                "data": {
+                                    "reason": stop_message,
+                                },
+                                "error": None,
+                            },
+                            progress_assessment=progress_assessment,
+                        )
                     state.mark_stopped(stop_message)
                     return state
 

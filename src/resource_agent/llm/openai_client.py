@@ -5,6 +5,14 @@ from typing import Any, Dict, List, Optional
 from resource_agent.config import load_env_file
 from resource_agent.llm.schemas import AgentDecision
 
+FALLBACK_ESTIMATED_COST = 0.002
+
+MODEL_PRICING_PER_MILLION = {
+    "gpt-5.4-mini": {
+        "input_per_million": 0.375,
+        "output_per_million": 2.25,
+    },
+}
 
 class OpenAILLMClient:
     """
@@ -28,6 +36,21 @@ class OpenAILLMClient:
             "OPENAI_REASONING_EFFORT",
             "low",
         )
+
+        self.input_cost_per_million = self._read_float_env(
+            "OPENAI_INPUT_COST_PER_MILLION"
+        )
+        self.output_cost_per_million = self._read_float_env(
+            "OPENAI_OUTPUT_COST_PER_MILLION"
+        )
+
+        if (self.input_cost_per_million is None) != (
+            self.output_cost_per_million is None
+        ):
+            raise ValueError(
+                "Set both OPENAI_INPUT_COST_PER_MILLION and "
+                "OPENAI_OUTPUT_COST_PER_MILLION together."
+            )
 
         if not self.api_key:
             raise ValueError(
@@ -163,25 +186,52 @@ class OpenAILLMClient:
 
     def _estimate_cost(self, response: Any) -> float:
         """
-        Keep a simple, explicit estimate for the assignment budget loop.
+        Estimate assignment-oriented cost from token usage.
 
-        We use the currently documented short-context pricing for gpt-5.4-mini:
-        input $0.375 / 1M tokens, output $2.25 / 1M tokens.
-        If usage is unavailable, fall back to a tiny non-zero cost so the budget
-        system still behaves deterministically during development.
+        Pricing can come from:
+        1. explicit environment variables
+        2. the local per-model pricing table
+        3. a deterministic fallback estimate
         """
-
         usage = self._extract_usage(response)
         if not usage:
-            return 0.002
+            return FALLBACK_ESTIMATED_COST
 
         input_tokens = usage.get("input_tokens", 0)
         output_tokens = usage.get("output_tokens", 0)
 
-        if self.model == "gpt-5.4-mini":
-            input_rate = 0.375 / 1_000_000
-            output_rate = 2.25 / 1_000_000
-            return round((input_tokens * input_rate) + (output_tokens * output_rate), 6)
+        pricing = self._resolve_pricing()
+        if pricing is None:
+            return FALLBACK_ESTIMATED_COST
 
-        # Safe fallback for now. We will make this model-aware in a later pass.
-        return 0.005
+        input_rate = pricing["input_per_million"] / 1_000_000
+        output_rate = pricing["output_per_million"] / 1_000_000
+
+        return round(
+            (input_tokens * input_rate) + (output_tokens * output_rate),
+            6,
+        )
+    
+    def _read_float_env(self, key: str) -> Optional[float]:
+        value = os.getenv(key)
+
+        if value is None or value == "":
+            return None
+
+        try:
+            return float(value)
+        except ValueError as exc:
+            raise ValueError(f"{key} must be a float if set.") from exc
+
+
+    def _resolve_pricing(self) -> Optional[Dict[str, float]]:
+        if (
+            self.input_cost_per_million is not None
+            and self.output_cost_per_million is not None
+        ):
+            return {
+                "input_per_million": self.input_cost_per_million,
+                "output_per_million": self.output_cost_per_million,
+            }
+
+        return MODEL_PRICING_PER_MILLION.get(self.model)

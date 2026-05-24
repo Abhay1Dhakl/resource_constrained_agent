@@ -22,15 +22,21 @@ class AgentState:
     Stores the state of the agent during execution."""
     task: str
     status: str = "running"
-
     steps: List[AgentStep] = field(default_factory=list)
-    tool_results: List[Dict[str, Any]] = field(default_factory=list)
     replanning_events: List[Dict[str, Any]] = field(default_factory=list)
     failed_actions_signature: set[str] = field(default_factory=set)
     final_answer: Optional[str] = None
     stop_reason: Optional[str]  = None
 
-    def add_step(self, thought: str, action: str, action_input: Dict[str, Any], observation: Dict[str, Any], progress_assessment: Optional[str] = None) -> None:
+    def add_step(
+                self,
+                thought: Optional[str],
+                action: Optional[str],
+                action_input: Optional[Dict[str, Any]],
+                observation: Dict[str, Any],
+                progress_assessment: Optional[str] = None,
+            ) -> None:
+        
         step_number = len(self.steps) + 1
         step = AgentStep(
             step_number=step_number,

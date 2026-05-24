@@ -10,6 +10,7 @@ class ActionInput(BaseModel):
     code: Optional[str] = None
     language: Optional[str] = None
     timeout: Optional[int] = None
+    section: Optional[str] = None
 
 
 class AgentDecision(BaseModel):

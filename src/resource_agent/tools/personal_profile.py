@@ -61,7 +61,7 @@ class PersonalProfileTool(BaseTool):
                 tool_name=self.name,
                 data={
                     "query": query,
-                    "profile": profile,
+                    "section": section,
                     "profile": selected_data,
                 }
             )
