@@ -1,7 +1,7 @@
 {
-  "name": "Aman",
+  "name": "Abhaya Dhakal",
   "target_role": "AI Engineer",
-  "target_companies": ["Jobins", "Cedar Gate"],
+  "target_companies": ["Jobins", "Cedar Gate", "Google", "Microsoft", "Amazon"],
   "skills": {
     "programming": ["Python", "SQL"],
     "ai_ml": ["Machine Learning", "NLP", "RAG", "LLM Applications", "Embeddings"],
