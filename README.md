@@ -4,6 +4,9 @@ A resource-constrained ReAct agent for the assignment planning loop. The agent o
 
 ## Run
 
+This project targets **Python 3.11+**. If your system `python3` is older, use a
+Python 3.11 interpreter explicitly or run the containerized path instead.
+
 ### Environment
 
 Create a `.env` file from `.env.example` and fill in the required API keys:
@@ -29,7 +32,7 @@ If `TAVILY_API_KEY` is missing, the web-search tool returns a structured error a
 ### Local Run
 
 ```bash
-python3 -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip setuptools wheel
 python -m pip install -e .
@@ -41,7 +44,7 @@ resource-agent
 If you want a browser-based demo URL, run the Streamlit wrapper locally first:
 
 ```bash
-python3 -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip setuptools wheel
 python -m pip install -r requirements.txt
@@ -75,6 +78,8 @@ docker run --rm --env-file .env resource-constrained-agent
 ```bash
 PYTHONPATH=src python -m unittest discover -s tests -v
 ```
+
+Run that command from a Python 3.11+ virtual environment.
 
 ## Architecture Overview
 
@@ -115,6 +120,8 @@ The planner instructions explicitly constrain the model to the available tools a
 The prompt pushes the model to:
 
 - choose only known tools
+- honor explicit user requests to execute code or use a specific tool when a
+  matching tool exists
 - mark whether it is making progress
 - use `replan` when a failed step is recoverable
 - use `stop` when continuing would waste budget

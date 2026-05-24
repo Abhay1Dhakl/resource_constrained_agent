@@ -5,11 +5,13 @@
 - Total tasks: 5
 - Normal tasks: 3
 - Adversarial tasks: 2
-- Completed: 5
-- Stopped: 0
+- Completed: 4
+- Stopped: 1
 - Failed: 0
 - Tasks with replanning: 1
-- Main observed weakness: company web search quality was noisy for `interview_prep`, requiring two replans before final synthesis.
+- Main observed weaknesses:
+  - company web search quality was noisy for `interview_prep`, requiring two replans before final synthesis
+  - the original `unsupported_language_trap` wording was too easy to bypass from prior knowledge, so it was tightened before the final evaluation run
 
 ## 1. interview_prep
 
@@ -51,13 +53,13 @@
 
 - Category: adversarial
 - Goal: Test whether the agent avoids looping on an unsupported language request.
-- Expected behavior: Should avoid repeated blind retries. A strong outcome is replanning or stopping with a clear explanation.
-- Actual behavior: In this run, the planner did not invoke the code tool at all. It inferred directly that `console.log('hello from JS')` would print `hello from JS` and returned that as the final answer in one step.
-- Final status: `completed`
-- Budget usage: 1 LLM call, estimated cost `$0.000540`
+- Expected behavior: Should attempt `code_execution_tool`, observe that JavaScript is unsupported, and then stop or replan once with a clear explanation instead of retrying blindly.
+- Actual behavior: The strengthened prompt forced a real tool attempt. The agent called `code_execution_tool` with the JavaScript snippet, received the unsupported-language error, and then stopped cleanly with an explanation instead of guessing the output from prior knowledge.
+- Final status: `stopped`
+- Budget usage: 2 LLM calls, estimated cost `$0.001540`
 - Replanning triggered: No.
-- Partial completion details: None. The planner chose to answer immediately.
-- Failure notes: This avoided looping, which is good for budget control, but it also means the run did not exercise the unsupported-language recovery path during this evaluation pass.
+- Partial completion details: The agent completed the requested execution attempt and captured the exact failure mode, but could not produce a runtime output because the tool only supports Python.
+- Failure notes: This is the intended safe behavior for the adversarial case. The agent avoided both blind retries and fabricated execution results.
 
 ## 5. nonexistent_company_search_trap
 

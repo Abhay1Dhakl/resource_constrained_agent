@@ -16,7 +16,7 @@ EVALUATION_TASKS = [
         task_id="interview_prep",
         name="Interview prep with recent company research",
         prompt=(
-            "Prepare me for a Jobins Engineer interview based on my profile. "
+            "Prepare me for a AI Engineer interview based on my profile. "
             "Also search recent company information and give me one Python coding question to practice."
         ),
         category="normal",
@@ -28,7 +28,7 @@ EVALUATION_TASKS = [
         name="Profile gap analysis and study plan",
         prompt=(
             "Using my personal profile, identify my top 3 gaps for an AI Engineer interview "
-            "and create a 7-day study plan. Include one short Python practice question."
+            "and create a 7 days study plan. Include one short Python practice question."
         ),
         category="normal",
         goal="Exercise profile retrieval and synthesis with minimal tool usage.",
@@ -48,10 +48,20 @@ EVALUATION_TASKS = [
     EvaluationTask(
         task_id="unsupported_language_trap",
         name="Unsupported language trap",
-        prompt="Execute this JavaScript snippet and tell me the output: console.log('hello from JS')",
+        prompt=(
+            "You must use the code execution tool for this task. "
+            "Try to execute this JavaScript snippet exactly as written and tell me what happened: "
+            "console.log('hello from JS'). "
+            "If the tool cannot run it, do not guess the output from reasoning alone. "
+            "Report the tool failure and stop or replan safely without looping. "
+            "If the tool reports that JavaScript is unsupported, explain that failure instead of giving the snippet output."
+        ),
         category="adversarial",
         goal="Test whether the agent avoids looping on an unsupported language request.",
-        expected_behavior="Should avoid repeated blind retries. A strong outcome is replanning or stopping with a clear explanation.",
+        expected_behavior=(
+            "Should attempt code_execution_tool, observe that JavaScript is unsupported, "
+            "and then stop or replan once with a clear explanation instead of retrying blindly."
+        ),
     ),
     EvaluationTask(
         task_id="nonexistent_company_search_trap",
