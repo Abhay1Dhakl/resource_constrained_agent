@@ -29,10 +29,43 @@ Optional variables:
 
 If `TAVILY_API_KEY` is missing, the web-search tool returns a structured error and web-dependent tasks may partially complete or stop early.
 
-### Local Run
+### Virtual Environment Activation
+
+Create the virtual environment with Python 3.11+:
 
 ```bash
 python3.11 -m venv .venv
+```
+
+Activate it with the command that matches your shell:
+
+- macOS/Linux (`bash` or `zsh`):
+
+  ```bash
+  source .venv/bin/activate
+  ```
+
+- macOS/Linux (`fish`):
+
+  ```fish
+  source .venv/bin/activate.fish
+  ```
+
+- Windows PowerShell:
+
+  ```powershell
+  .venv\Scripts\Activate.ps1
+  ```
+
+- Windows Command Prompt:
+
+  ```cmd
+  .venv\Scripts\activate.bat
+  ```
+
+### Local Run
+
+```bash
 source .venv/bin/activate
 python -m pip install --upgrade pip setuptools wheel
 python -m pip install -e .
@@ -44,7 +77,6 @@ resource-agent
 If you want a browser-based demo URL, run the Streamlit wrapper locally first:
 
 ```bash
-python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip setuptools wheel
 python -m pip install -r requirements.txt
@@ -79,7 +111,8 @@ docker run --rm --env-file .env resource-constrained-agent
 PYTHONPATH=src python -m unittest discover -s tests -v
 ```
 
-Run that command from a Python 3.11+ virtual environment.
+Run that command from the activated Python 3.11+ virtual environment shown
+above.
 
 ## Architecture Overview
 
