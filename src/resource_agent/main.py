@@ -1,10 +1,5 @@
 from resource_agent.agent.react_agent import ReactAgent
-
-
-DEFAULT_TASK = (
-    "Prepare me for a Cedar Gate AI Engineer interview based on my profile. "
-    "Also search recent company information and give me one Python coding question to practice."
-)
+from resource_agent.evaluation.tasks import EVALUATION_TASKS
 
 
 def print_agent_result(scenario_name: str, state, budget_summary):
@@ -66,28 +61,14 @@ def run_scenario(
 
 
 def main():
-    run_scenario(
-        scenario_name="normal_budget",
-        task=DEFAULT_TASK,
-        max_steps=5,
-        max_calls=10,
-        max_cost=0.20,
-    )
-    run_scenario(
-        scenario_name="tight_call_budget",
-        task=DEFAULT_TASK,
-        max_steps=10,
-        max_calls=2,
-        max_cost=0.20,
-    )
-    run_scenario(
-        scenario_name="tight_cost_budget",
-        task=DEFAULT_TASK,
-        max_steps=10,
-        max_calls=10,
-        max_cost=0.02,
-    )
-
+    for evaluation_task in EVALUATION_TASKS:
+        run_scenario(
+            scenario_name=evaluation_task.task_id,
+            task=evaluation_task.prompt,
+            max_steps=6,
+            max_calls=10,
+            max_cost=0.20,
+        )
 
 if __name__ == "__main__":
     main()

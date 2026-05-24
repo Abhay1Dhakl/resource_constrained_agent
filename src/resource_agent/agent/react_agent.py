@@ -121,12 +121,17 @@ class ReactAgent:
                     progress_assessment=progress_assessment,
                 )
 
-                if status == "replan" and not normalized_result.get("success", False):
+                if status == "replan":
+                    previous_action = action
+                    if len(state.steps) > 1 and state.steps[-2].action:
+                        previous_action = state.steps[-2].action
+
                     state.add_replanning_event(
                         step_number=state.steps[-1].step_number,
-                        action=action,
-                        reason=reason or normalized_result.get("error") or "Tool failed",
+                        action=previous_action,
+                        reason=reason or normalized_result.get("error") or "Planner revised approach",
                         next_action=action,
+                        successful=normalized_result.get("success", False),
                     )
 
             state.mark_stopped(

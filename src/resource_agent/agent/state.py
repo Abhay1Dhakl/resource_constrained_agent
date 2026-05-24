@@ -87,12 +87,13 @@ class AgentState:
         self.final_answer = f"The agent stopped because: {reason}"
         self.stop_reason = reason
     
-    def add_replanning_event(self, step_number: int, action: str, reason: str, next_action: Optional[str]) -> None:
+    def add_replanning_event(self, step_number: int, action: str, reason: str, next_action: Optional[str], successful: bool) -> None:
         self.replanning_events.append(
             {
                 "step_number": step_number,
                 "failed_action": action,
                 "reason": reason,
                 "next_action": next_action,
+                "successful": successful,
             }
         )
