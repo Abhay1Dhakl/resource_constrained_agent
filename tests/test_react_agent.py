@@ -1,6 +1,7 @@
 import unittest
 from resource_agent.agent.react_agent import ReactAgent
 
+
 class OverBudgetLLM:
     def generate(self, **kwargs):
         return {
@@ -14,7 +15,8 @@ class OverBudgetLLM:
             },
             "cost": 0.25,
         }
-    
+
+
 class RepeatReplanLLM:
     def __init__(self):
         self.calls = 0
@@ -54,6 +56,7 @@ class RepeatReplanLLM:
             },
             "cost": 0.01,
         }
+
 
 class SuccessfulReplanLLM:
     def __init__(self):
@@ -108,6 +111,42 @@ class SuccessfulReplanLLM:
             },
             "cost": 0.01,
         }
+
+
+class MidTaskBudgetLLM:
+    def __init__(self):
+        self.calls = 0
+
+    def generate(self, **kwargs):
+        self.calls += 1
+
+        if self.calls == 1:
+            return {
+                "content": {
+                    "thought": "Fetch the user profile first.",
+                    "progress_assessment": "no_progress",
+                    "status": "continue",
+                    "action": "personal_profile_tool",
+                    "action_input": {"query": "profile"},
+                    "reason": "Need profile context before answering.",
+                },
+                "cost": 0.01,
+            }
+
+        return {
+            "content": {
+                "thought": "I have enough context to answer now.",
+                "progress_assessment": "enough_information",
+                "status": "final_answer",
+                "action": None,
+                "action_input": {},
+                "reason": "Ready to answer.",
+                "final_answer": "This answer should never be recorded because the second call exceeds budget.",
+            },
+            "cost": 0.01,
+        }
+
+
 class ReactAgentSmokeTests(unittest.TestCase):
     def test_budget_overrun_stops_cleanly(self):
         agent = ReactAgent(
@@ -123,7 +162,24 @@ class ReactAgentSmokeTests(unittest.TestCase):
         self.assertIn("Cost limit exceeded", state.stop_reason)
         self.assertEqual(len(state.steps), 0)
         self.assertIn("The agent stopped because:", state.final_answer)
-    
+
+    def test_mid_task_budget_stop_preserves_partial_progress(self):
+        agent = ReactAgent(
+            max_steps=3,
+            max_calls=10,
+            max_cost=0.015,
+            llm=MidTaskBudgetLLM(),
+        )
+
+        state = agent.run("mid-task budget test")
+
+        self.assertEqual(state.status, "stopped")
+        self.assertIn("Cost limit exceeded", state.stop_reason)
+        self.assertEqual(len(state.steps), 1)
+        self.assertEqual(state.steps[0].action, "personal_profile_tool")
+        self.assertTrue(state.steps[0].observation["success"])
+        self.assertIn("The agent stopped because:", state.final_answer)
+
     def test_repeated_replan_is_blocked(self):
         agent = ReactAgent(
             max_steps=4,
@@ -155,7 +211,7 @@ class ReactAgentSmokeTests(unittest.TestCase):
             "Blocked repeated replanning attempt",
             second_step.observation["error"],
         )
-    
+
     def test_successful_replan_is_recorded(self):
         agent = ReactAgent(
             max_steps=5,
@@ -183,5 +239,7 @@ class ReactAgentSmokeTests(unittest.TestCase):
         self.assertFalse(state.steps[0].observation["success"])
         self.assertTrue(state.steps[1].observation["success"])
         self.assertEqual(state.steps[2].observation["tool_name"], "final_answer")
+
+
 if __name__ == "__main__":
     unittest.main()

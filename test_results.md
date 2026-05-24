@@ -16,12 +16,12 @@
 - Category: normal
 - Goal: Exercise profile lookup plus web search with a useful final answer.
 - Expected behavior: Should use personal_profile_tool and web_search_tool, then answer within budget.
-- Actual behavior: The agent retrieved the personal profile first, then attempted web research for Cedar Gate. The first search failed because it used an unsupported `topic` value, and two follow-up search attempts were needed before the agent produced a tailored interview-prep answer with company context and a Python practice question.
+- Actual behavior: The agent retrieved the personal profile first, then attempted web research for Jobins. The first search failed because it used an unsupported `topic` value, and two follow-up search attempts were needed before the agent produced a tailored interview-prep answer with company context and a Python practice question.
 - Final status: `completed`
 - Budget usage: 5 LLM calls, estimated cost `$0.009841`
 - Replanning triggered: Yes. Two replanning events were recorded, both around recovering from web-search issues.
-- Partial completion details: After step 1, the agent had the user profile but no company context. After the failed search and first retry, it had partial research context but still needed a better Cedar Gate-specific result.
-- Failure notes: The first web search used an invalid `topic` and failed validation. The subsequent search results were noisy and risked mixing Cedar Gate with unrelated Cedar/Cedars-Sinai results, so the run succeeded but exposed search-quality weakness.
+- Partial completion details: After step 1, the agent had the user profile but no company context. After the failed search and first retry, it had partial research context but still needed a better Jobins-specific result.
+- Failure notes: The first web search used an invalid `topic` and failed validation. The subsequent search results were still somewhat noisy, so the run succeeded but exposed search-quality weakness.
 
 ## 2. profile_gap_study_plan
 

@@ -120,15 +120,17 @@ The biggest known limitation is the code execution tool. It is a restricted subp
 The repository includes:
 
 - evaluation task definitions in `src/resource_agent/evaluation/tasks.py`
-- a task-by-task reporting template in `test_results.md`
+- a task-by-task evaluation report in `test_results.md`
 - smoke tests in `tests/`
 
 Current smoke coverage verifies:
 
 - budget overrun stops cleanly
+- mid-task budget stop preserves completed progress
 - repeated fake replanning is blocked
 - successful replanning is recorded
 - profile section filtering returns only the requested data
+- unknown tool lookup returns a structured error
 
 See also:
 
