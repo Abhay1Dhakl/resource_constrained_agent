@@ -13,6 +13,11 @@ dependencies = [
   "tavily-python",
 ]
 
+[project.optional-dependencies]
+demo = [
+  "streamlit>=1.45,<2",
+]
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 

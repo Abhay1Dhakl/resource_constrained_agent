@@ -36,6 +36,21 @@ python -m pip install -e .
 resource-agent
 ```
 
+### Local Demo UI
+
+If you want a browser-based demo URL, run the Streamlit wrapper locally first:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
+streamlit run streamlit_app.py
+```
+
+The app will open locally in your browser and lets you enter a task, run the
+agent, and inspect the full trace and budget summary.
+
 ### Docker Run
 
 The repository includes a `Dockerfile` and `docker-compose.yml`. After creating `.env`, run:
@@ -136,3 +151,20 @@ See also:
 
 - `decisions.md`
 - `test_results.md`
+
+## Deploy A Demo URL
+
+The repository now includes `streamlit_app.py`, which is the fastest path to a
+shareable public demo.
+
+Recommended path:
+
+1. Push this repository to GitHub.
+2. In Streamlit Community Cloud, create a new app from the repo.
+3. Set the entrypoint file to `streamlit_app.py`.
+4. Add `OPENAI_API_KEY` and, if you want live web search, `TAVILY_API_KEY` in
+   the app secrets.
+5. Deploy and use the generated `*.streamlit.app` URL as your demo link.
+
+If you do not provide `TAVILY_API_KEY`, the app still runs, but search-heavy
+tasks may stop early or return partial results.
