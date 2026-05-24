@@ -1,5 +1,5 @@
+import json
 from typing import Any, Dict
-
 from resource_agent.agent.state import AgentState
 from resource_agent.budget.budget_manager import BudgetExceededError, BudgetManager
 from resource_agent.llm import build_llm_client
@@ -101,6 +101,38 @@ class ReactAgent:
                 if not action:
                     state.mark_failed("Planner did not return an action")
                     return state
+                
+                action_signature = self._action_signature(action, action_input)
+
+                if status == "replan" and state.has_failed_attempt(action_signature):
+                    blocked_observation = {
+                        "success": False,
+                        "tool_name": action,
+                        "data": {},
+                        "error": (
+                            "Blocked repeated replanning attempt: the same action and "
+                            "action_input already failed earlier."
+                        ),
+                    }
+
+                    state.add_step(
+                        thought=thought,
+                        action=action,
+                        action_input=action_input,
+                        observation=blocked_observation,
+                        progress_assessment="blocked",
+                    )
+
+                    state.add_replanning_event(
+                        step_number=state.steps[-1].step_number,
+                        action=action,
+                        reason=reason or "Planner repeated an earlier failed attempt.",
+                        next_action=action,
+                        successful=False,
+                    )
+
+                    state.mark_stopped("Repeated replanning attempt was blocked to prevent a loop.")
+                    return state
 
 
                 tool_result = self._run_tool(
@@ -112,6 +144,9 @@ class ReactAgent:
                     tool_name=action,
                     result=tool_result,
                 )
+
+                if not normalized_result.get("success", False):
+                    state.remember_failed_action(action_signature)
 
                 state.add_step(
                     thought=thought,
@@ -223,6 +258,9 @@ class ReactAgent:
             "data": {},
             "error": f"Unsupported tool result type: {type(result)}",
         }
+
+    def _action_signature(self, action: str, action_input: Dict[str, Any]) -> str:
+        return f"{action}:{json.dumps(action_input or {}, sort_keys=True, ensure_ascii=True)}"
 
     def budget_summary(self) -> Dict[str, Any]:
         return self.budget.summary()

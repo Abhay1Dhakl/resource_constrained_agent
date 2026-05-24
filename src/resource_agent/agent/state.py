@@ -26,7 +26,7 @@ class AgentState:
     steps: List[AgentStep] = field(default_factory=list)
     tool_results: List[Dict[str, Any]] = field(default_factory=list)
     replanning_events: List[Dict[str, Any]] = field(default_factory=list)
-
+    failed_actions_signature: set[str] = field(default_factory=set)
     final_answer: Optional[str] = None
     stop_reason: Optional[str]  = None
 
@@ -97,3 +97,9 @@ class AgentState:
                 "successful": successful,
             }
         )
+    
+    def remember_failed_action(self, action_signature: str) -> None:
+         self.failed_actions_signature.add(action_signature)
+    
+    def has_failed_attempt(self, action_signature: str) -> bool:
+        return action_signature in self.failed_actions_signature
