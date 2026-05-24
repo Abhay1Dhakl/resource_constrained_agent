@@ -27,12 +27,28 @@ class ReactAgent:
         max_cost: float = 0.20,
         llm=None,
     ):
+        """Initialize the agent runtime and supporting components.
+
+        Args:
+            max_steps: Maximum planner-tool iterations allowed in one run.
+            max_calls: Maximum number of LLM calls permitted by budget.
+            max_cost: Maximum cumulative LLM spend permitted by budget.
+            llm: Optional injected LLM client used for testing or customization.
+        """
         self.llm = llm or build_llm_client()
         self.budget = BudgetManager(max_calls=max_calls, max_cost=max_cost)
         self.tools = ToolRegistry()
         self.max_steps = max_steps
 
     def run(self, task: str) -> AgentState:
+        """Run the ReAct loop until completion, stop, or failure.
+
+        Args:
+            task: User task the planner should solve.
+
+        Returns:
+            AgentState: Final state containing the full execution trace.
+        """
         state = AgentState(task=task)
         try:
             for _ in range(self.max_steps):
@@ -193,12 +209,14 @@ class ReactAgent:
             return state
 
     def _run_tool(self, tool_name: str, tool_input: Dict[str, Any]) -> Any:
-        """
-        Runs a tool through ToolRegistry.
+        """Run a named tool through the registry abstraction.
 
-        Supports both:
-        - registry.run_tool(name, input)
-        - registry.get_tool(name).run(input)
+        Args:
+            tool_name: Registry name of the tool to execute.
+            tool_input: Structured payload passed to the tool.
+
+        Returns:
+            Any: Raw tool response before normalization.
         """
 
         if hasattr(self.tools, "run_tool"):
@@ -229,15 +247,24 @@ class ReactAgent:
         tool_name: str,
         result: Any,
     ) -> Dict[str, Any]:
-        """
-        Converts tool result into a normal dictionary.
+        """Convert a raw tool result into the agent observation format.
 
-        This supports:
-        - plain dict
-        - Pydantic model with model_dump()
-        - older Pydantic model with dict()
+        Args:
+            tool_name: Tool name to use when the result omits one.
+            result: Raw value returned by the tool implementation.
+
+        Returns:
+            Dict[str, Any]: Normalized observation payload for agent state.
         """
         def to_observation(payload: Dict[str, Any]) -> Dict[str,Any]:
+            """Map a raw tool payload into the standard observation schema.
+
+            Args:
+                payload: Raw dictionary returned by a tool implementation.
+
+            Returns:
+                Dict[str, Any]: Observation dictionary stored in agent state.
+            """
             error = payload.get("error")
             if error is None:
                 error = payload.get("error_message")
@@ -274,8 +301,18 @@ class ReactAgent:
         }
 
     def _action_signature(self, action: str, action_input: Dict[str, Any]) -> str:
+        """Build a stable signature for detecting repeated failed actions.
+
+        Args:
+            action: Tool name chosen by the planner.
+            action_input: Structured payload passed to the tool.
+
+        Returns:
+            str: Deterministic signature of the action and input payload.
+        """
         return f"{action}:{json.dumps(action_input or {}, sort_keys=True, ensure_ascii=True)}"
 
     def budget_summary(self) -> Dict[str, Any]:
+        """Return the current budget summary for reporting."""
         return self.budget.summary()
     

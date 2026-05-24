@@ -28,6 +28,19 @@ class OpenAILLMClient:
         reasoning_effort: Optional[str] = None,
         api_key: Optional[str] = None,
     ) -> None:
+        """Initialize the OpenAI-backed planner client.
+
+        Args:
+            model: Optional model name override for planner calls.
+            reasoning_effort: Optional reasoning effort override for Responses
+                API requests.
+            api_key: Optional API key override used for authentication.
+
+        Raises:
+            ValueError: Raised when required credentials or pricing settings are
+                invalid.
+            ImportError: Raised when the OpenAI SDK is not installed.
+        """
         load_env_file()
 
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
@@ -73,13 +86,20 @@ class OpenAILLMClient:
         budget_summary: Optional[Dict[str, Any]] = None,
         tools: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
-        """
-        Return a structured planning decision.
+        """Return the next structured planning decision from the model.
 
-        The model is asked to:
-        - assess whether the latest step made progress
-        - decide whether to continue, replan, stop, or finalize
-        - choose one of the available tools when another tool step is needed
+        Args:
+            task: User task the planner is trying to solve.
+            scratchpad: Serialized history of prior steps and observations.
+            budget_summary: Current budget usage snapshot for the run.
+            tools: Tool metadata exposed to the planner.
+
+        Returns:
+            Dict[str, Any]: Parsed planner decision plus cost and usage metadata.
+
+        Raises:
+            ValueError: Raised when the API response does not include a parsed
+                planner decision.
         """
 
         scratchpad = scratchpad or "No steps completed yet."
@@ -113,6 +133,14 @@ class OpenAILLMClient:
         }
 
     def _build_instructions(self, tools: List[Dict[str, str]]) -> str:
+        """Build the planner system instructions including available tools.
+
+        Args:
+            tools: Tool metadata available to the planner.
+
+        Returns:
+            str: Instruction string sent to the model.
+        """
         tool_lines = []
         for tool in tools:
             tool_lines.append(f"- {tool['name']}: {tool['description']}")
@@ -143,6 +171,16 @@ class OpenAILLMClient:
         scratchpad: str,
         budget_summary: Dict[str, Any],
     ) -> str:
+        """Build the user input payload for the planner call.
+
+        Args:
+            task: User task being solved.
+            scratchpad: Serialized trace of previous agent steps.
+            budget_summary: Current budget usage snapshot.
+
+        Returns:
+            str: Combined task and runtime context for the planner.
+        """
         return (
             "Task:\n"
             f"{task}\n\n"
@@ -154,6 +192,14 @@ class OpenAILLMClient:
         )
 
     def _normalize_decision(self, payload: AgentDecision) -> Dict[str, Any]:
+        """Convert a validated planner decision model into a plain dict.
+
+        Args:
+            payload: Structured planner response validated by Pydantic.
+
+        Returns:
+            Dict[str, Any]: Plain dictionary consumed by the agent loop.
+        """
         return {
             "thought": payload.thought,
             "progress_assessment": payload.progress_assessment,
@@ -169,6 +215,15 @@ class OpenAILLMClient:
         }
 
     def _extract_usage(self, response: Any) -> Dict[str, Any]:
+        """Extract token usage details from an OpenAI response object.
+
+        Args:
+            response: Raw response returned by the OpenAI SDK.
+
+        Returns:
+            Dict[str, Any]: Usage payload when available, otherwise an empty
+                dictionary.
+        """
         usage = getattr(response, "usage", None)
         if usage is None:
             return {}
@@ -185,13 +240,13 @@ class OpenAILLMClient:
         return {}
 
     def _estimate_cost(self, response: Any) -> float:
-        """
-        Estimate assignment-oriented cost from token usage.
+        """Estimate the planner call cost from token usage and pricing data.
 
-        Pricing can come from:
-        1. explicit environment variables
-        2. the local per-model pricing table
-        3. a deterministic fallback estimate
+        Args:
+            response: Raw response returned by the OpenAI SDK.
+
+        Returns:
+            float: Estimated cost for the planner call.
         """
         usage = self._extract_usage(response)
         if not usage:
@@ -213,6 +268,18 @@ class OpenAILLMClient:
         )
     
     def _read_float_env(self, key: str) -> Optional[float]:
+        """Read an environment variable as a float when it is set.
+
+        Args:
+            key: Environment variable name to parse.
+
+        Returns:
+            Optional[float]: Parsed float value or `None` when unset.
+
+        Raises:
+            ValueError: Raised when the environment value cannot be parsed as a
+                float.
+        """
         value = os.getenv(key)
 
         if value is None or value == "":
@@ -225,6 +292,12 @@ class OpenAILLMClient:
 
 
     def _resolve_pricing(self) -> Optional[Dict[str, float]]:
+        """Resolve the pricing configuration for the current model.
+
+        Returns:
+            Optional[Dict[str, float]]: Input and output token pricing when
+                available.
+        """
         if (
             self.input_cost_per_million is not None
             and self.output_cost_per_million is not None

@@ -29,6 +29,15 @@ class CodeExecutionTool(BaseTool):
     blocked_calls = {"open", "exec", "eval", "compile", "globals", "locals", "__import__", "input"}
 
     def run(self, arguments: Dict[str, Any]) ->ToolResult:
+        """Validate and execute a Python snippet in a temporary subprocess.
+
+        Args:
+            arguments: Tool payload containing `code`, `language`, and an
+                optional `timeout`.
+
+        Returns:
+            ToolResult: Execution output or validation and runtime errors.
+        """
         code = arguments.get("code", "")
         language = arguments.get("language", "python")
         timeout = arguments.get("timeout", DEFAULT_TIMEOUT_SECONDS)
@@ -119,6 +128,14 @@ class CodeExecutionTool(BaseTool):
             )
         
     def _validate_code(self, code: str) -> str:
+        """Check the code snippet for blocked imports and calls.
+
+        Args:
+            code: Python source code to validate.
+
+        Returns:
+            str: Empty string when valid, otherwise a validation error message.
+        """
         try:
             tree = ast.parse(code)
 
@@ -145,4 +162,3 @@ class CodeExecutionTool(BaseTool):
                     return f"Use of function '{node.func.attr}' is not allowed."
         
         return ""
-

@@ -3,10 +3,21 @@ from pathlib import Path
 
 
 def project_root() -> Path:
+    """Return the repository root directory for the project.
+
+    Returns:
+        Path: Absolute path to the repository root.
+    """
     return Path(__file__).resolve().parents[2]
 
 
 def load_env_file(env_path: Path | None = None) -> None:
+    """Load environment variables from a local `.env` file if present.
+
+    Args:
+        env_path: Optional path to the environment file. When omitted, the
+            project-level `.env` file is used.
+    """
     path = env_path or project_root() / ".env"
 
     if not path.exists():

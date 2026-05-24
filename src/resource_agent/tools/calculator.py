@@ -16,6 +16,15 @@ class CalculatorTool:
     }
 
     def run(self, expression: str) -> dict:
+        """Evaluate a basic arithmetic expression safely.
+
+        Args:
+            expression: Arithmetic expression to evaluate.
+
+        Returns:
+            dict: Result payload containing either the computed value or an
+                error message.
+        """
         try:
             result = self._safe_eval(expression)
 
@@ -35,10 +44,26 @@ class CalculatorTool:
             }
 
     def _safe_eval(self, expression: str):
+        """Parse an arithmetic expression and evaluate its AST body.
+
+        Args:
+            expression: Arithmetic expression to parse.
+
+        Returns:
+            Any: Numeric result of the evaluated expression.
+        """
         node = ast.parse(expression, mode="eval").body
         return self._eval_node(node)
 
     def _eval_node(self, node):
+        """Recursively evaluate a supported arithmetic AST node.
+
+        Args:
+            node: AST node produced from a parsed expression.
+
+        Returns:
+            Any: Numeric value represented by the node.
+        """
         if isinstance(node, ast.Constant):
             if isinstance(node.value, (int, float)):
                 return node.value

@@ -13,12 +13,18 @@ TIMEOUT_SECONDS = 10
 DEFAULT_MAX_RESULTS = 5
 MAX_MAX_RESULTS = 10
 ALLOWED_TOPICS = {"general", "news"}
+
 class WebSearchTool(BaseTool):
     name = "web_search_tool"
     description = ("Searches the web for information based on a query. It accepts a search query as input and returns relevant search results."
                      "This tool uses the Tavily API for web search functionality.")
     
     def __init__(self, api_key: str | None = None):
+        """Configure the Tavily-backed web search tool.
+
+        Args:
+            api_key: Optional Tavily API key override.
+        """
         load_env_file()
         self.api_key = api_key or os.getenv("TAVILY_API_KEY")
 
@@ -29,6 +35,16 @@ class WebSearchTool(BaseTool):
             self.client = None
     
     def run(self, arguments: Dict[str, Any]) -> ToolResult:
+        """Execute a web search request with input validation and timeout.
+
+        Args:
+            arguments: Tool payload containing `query`, `max_results`, and an
+                optional `topic`.
+
+        Returns:
+            ToolResult: Search response with answer and normalized sources, or
+                an error payload.
+        """
         query = arguments.get("query")
         max_results = arguments.get("max_results", DEFAULT_MAX_RESULTS)
         topic = arguments.get("topic")
@@ -105,14 +121,14 @@ class WebSearchTool(BaseTool):
             )
     
     def _normalize_results(self, results: List[Dict[str, Any]], max_results: int) -> List[Dict[str, Any]]:
-        """
-        Normalizes the raw search results from Tavily into a consistent format.
+        """Normalize raw Tavily results into the agent's source schema.
 
-        Each result will have:
-        - title: The title of the search result
-        - url: The URL of the search result
-        - snippet: A brief snippet or summary of the content
-        - source: The source or domain of the result
+        Args:
+            results: Raw Tavily search result list.
+            max_results: Maximum number of sources to keep.
+
+        Returns:
+            List[Dict[str, Any]]: Normalized source entries for the agent.
         """
 
         normalized = []

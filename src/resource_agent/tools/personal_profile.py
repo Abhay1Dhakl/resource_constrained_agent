@@ -23,6 +23,12 @@ class PersonalProfileTool(BaseTool):
                    "target role, and interview preparation focus")
     
     def __init__(self, profile_path: str = "data/personal_profile.json"):
+        """Configure the profile lookup tool.
+
+        Args:
+            profile_path: Absolute or project-relative path to the profile JSON
+                file.
+        """
         path = Path(profile_path)
 
         if path.is_absolute():
@@ -31,6 +37,14 @@ class PersonalProfileTool(BaseTool):
             self.profile_path = project_root() / path
 
     def run(self, arguments: Dict[str, Any]) -> ToolResult:
+        """Load the profile data and optionally filter to one section.
+
+        Args:
+            arguments: Tool payload that may include `query` and `section`.
+
+        Returns:
+            ToolResult: Profile lookup result or validation error details.
+        """
         try:
             if not self.profile_path.exists():
                 return ToolResult(
@@ -80,5 +94,10 @@ class PersonalProfileTool(BaseTool):
             )
 
     def _load_profile(self) -> Dict[str, Any]:
+        """Read the profile JSON file from disk.
+
+        Returns:
+            Dict[str, Any]: Parsed profile payload.
+        """
         with self.profile_path.open("r", encoding="utf-8") as file:
             return json.load(file)

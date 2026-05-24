@@ -15,4 +15,12 @@ class BaseTool(ABC):
 
     @abstractmethod
     def run(self, arguments: Dict[str, Any]) -> ToolResult:
+        """Execute the tool with the provided arguments.
+
+        Args:
+            arguments: Structured input payload for the tool.
+
+        Returns:
+            ToolResult: Normalized tool execution result.
+        """
         pass
