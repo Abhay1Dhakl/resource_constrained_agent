@@ -48,7 +48,7 @@ class BudgetManager:
         self.calls_used += 1
         self.total_cost += cost
 
-    def summary(self) -> str:
+    def summary(self) -> dict[str, int | float]:
         """Return a snapshot of current budget usage and remaining limits.
 
         Returns:

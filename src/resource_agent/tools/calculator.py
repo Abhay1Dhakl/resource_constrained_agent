@@ -1,7 +1,10 @@
 import ast
 import operator as op
+from typing import Any, Dict
 
-class CalculatorTool:
+from resource_agent.tools.base import BaseTool, ToolResult
+
+class CalculatorTool(BaseTool):
     name = "calculator"
     description = "A simple calculator that can evaluate basic arithmetic expressions."
     timeout_seconds = 2
@@ -15,33 +18,46 @@ class CalculatorTool:
         ast.USub: op.neg,
     }
 
-    def run(self, expression: str) -> dict:
+    def run(self, arguments: Dict[str, Any]) -> ToolResult:
         """Evaluate a basic arithmetic expression safely.
 
         Args:
-            expression: Arithmetic expression to evaluate.
+            arguments: Tool payload containing the `expression` to evaluate.
 
         Returns:
-            dict: Result payload containing either the computed value or an
-                error message.
+            ToolResult: Result payload containing either the computed value or
+                an error message.
         """
+        expression = arguments.get("expression")
+
+        if not isinstance(expression, str) or not expression.strip():
+            return ToolResult(
+                success=False,
+                tool_name=self.name,
+                error_message="No arithmetic expression provided.",
+            )
+
         try:
             result = self._safe_eval(expression)
 
-            return {
-                "tool": self.name,
-                "success": True,
-                "input": expression,
-                "result": result,
-            }
+            return ToolResult(
+                success=True,
+                tool_name=self.name,
+                data={
+                    "expression": expression,
+                    "result": result,
+                },
+            )
 
         except (ValueError, SyntaxError, ZeroDivisionError, TypeError) as error:
-            return {
-                "tool": self.name,
-                "success": False,
-                "input": expression,
-                "error": str(error),
-            }
+            return ToolResult(
+                success=False,
+                tool_name=self.name,
+                data={
+                    "expression": expression,
+                },
+                error_message=str(error),
+            )
 
     def _safe_eval(self, expression: str):
         """Parse an arithmetic expression and evaluate its AST body.
