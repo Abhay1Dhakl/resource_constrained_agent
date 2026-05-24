@@ -25,6 +25,19 @@ class ToolRegistryTests(unittest.TestCase):
         self.assertEqual(result.tool_name, "missing_tool")
         self.assertEqual(result.error_message, "Tool 'missing_tool' not found")
 
+    def test_registry_uses_profile_override(self):
+        registry = ToolRegistry(
+            profile_data={"skills": {"programming": ["Rust"]}},
+        )
+
+        result = registry.run_tool("personal_profile_tool", {"section": "skills"})
+
+        self.assertTrue(result.success)
+        self.assertEqual(
+            result.data["profile"]["skills"]["programming"],
+            ["Rust"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

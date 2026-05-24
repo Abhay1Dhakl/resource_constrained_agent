@@ -147,6 +147,40 @@ class MidTaskBudgetLLM:
         }
 
 
+class CustomProfileLLM:
+    def __init__(self):
+        self.calls = 0
+
+    def generate(self, **kwargs):
+        self.calls += 1
+
+        if self.calls == 1:
+            return {
+                "content": {
+                    "thought": "Fetch the profile name first.",
+                    "progress_assessment": "progress",
+                    "status": "continue",
+                    "action": "personal_profile_tool",
+                    "action_input": {"query": "profile", "section": "name"},
+                    "reason": "Need the hosted profile data.",
+                },
+                "cost": 0.01,
+            }
+
+        return {
+            "content": {
+                "thought": "The profile was loaded.",
+                "progress_assessment": "enough_information",
+                "status": "final_answer",
+                "action": None,
+                "action_input": {},
+                "reason": "Done.",
+                "final_answer": "Profile loaded.",
+            },
+            "cost": 0.01,
+        }
+
+
 class ReactAgentSmokeTests(unittest.TestCase):
     def test_budget_overrun_stops_cleanly(self):
         agent = ReactAgent(
@@ -239,6 +273,23 @@ class ReactAgentSmokeTests(unittest.TestCase):
         self.assertFalse(state.steps[0].observation["success"])
         self.assertTrue(state.steps[1].observation["success"])
         self.assertEqual(state.steps[2].observation["tool_name"], "final_answer")
+
+    def test_agent_uses_custom_profile_data(self):
+        agent = ReactAgent(
+            max_steps=3,
+            max_calls=10,
+            max_cost=0.20,
+            llm=CustomProfileLLM(),
+            profile_data={"name": "Hosted Demo User"},
+        )
+
+        state = agent.run("custom profile test")
+
+        self.assertEqual(state.status, "completed")
+        self.assertEqual(
+            state.steps[0].observation["data"]["profile"]["name"],
+            "Hosted Demo User",
+        )
 
 
 if __name__ == "__main__":
