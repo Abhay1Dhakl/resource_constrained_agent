@@ -1,3 +1,4 @@
+from copy import deepcopy
 import json
 from typing import Dict, Any
 from pathlib import Path
@@ -22,14 +23,21 @@ class PersonalProfileTool(BaseTool):
     description = ("This tool retrieves the user's personal profile, skills, projects, weak areas,"
                    "target role, and interview preparation focus")
     
-    def __init__(self, profile_path: str = "data/personal_profile.json"):
+    def __init__(
+        self,
+        profile_path: str = "data/personal_profile.json",
+        profile_data: Dict[str, Any] | None = None,
+    ):
         """Configure the profile lookup tool.
 
         Args:
             profile_path: Absolute or project-relative path to the profile JSON
                 file.
+            profile_data: Optional in-memory profile payload that overrides the
+                file-based profile. Useful for hosted or per-session demos.
         """
         path = Path(profile_path)
+        self.profile_data = profile_data
 
         if path.is_absolute():
             self.profile_path = path
@@ -46,7 +54,7 @@ class PersonalProfileTool(BaseTool):
             ToolResult: Profile lookup result or validation error details.
         """
         try:
-            if not self.profile_path.exists():
+            if self.profile_data is None and not self.profile_path.exists():
                 return ToolResult(
                     success = False,
                     tool_name = self.name,
@@ -99,5 +107,10 @@ class PersonalProfileTool(BaseTool):
         Returns:
             Dict[str, Any]: Parsed profile payload.
         """
+        if self.profile_data is not None:
+            if not isinstance(self.profile_data, dict):
+                raise ValueError("Profile data must be a JSON object at the top level.")
+            return deepcopy(self.profile_data)
+
         with self.profile_path.open("r", encoding="utf-8") as file:
             return json.load(file)

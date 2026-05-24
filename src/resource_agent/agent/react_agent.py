@@ -26,6 +26,8 @@ class ReactAgent:
         max_calls: int = 10,
         max_cost: float = 0.20,
         llm=None,
+        tool_registry: ToolRegistry | None = None,
+        profile_data: Dict[str, Any] | None = None,
     ):
         """Initialize the agent runtime and supporting components.
 
@@ -34,10 +36,14 @@ class ReactAgent:
             max_calls: Maximum number of LLM calls permitted by budget.
             max_cost: Maximum cumulative LLM spend permitted by budget.
             llm: Optional injected LLM client used for testing or customization.
+            tool_registry: Optional injected tool registry used for testing or
+                runtime customization.
+            profile_data: Optional in-memory profile payload used by the default
+                tool registry. Ignored when `tool_registry` is supplied.
         """
         self.llm = llm or build_llm_client()
         self.budget = BudgetManager(max_calls=max_calls, max_cost=max_cost)
-        self.tools = ToolRegistry()
+        self.tools = tool_registry or ToolRegistry(profile_data=profile_data)
         self.max_steps = max_steps
 
     def run(self, task: str) -> AgentState:

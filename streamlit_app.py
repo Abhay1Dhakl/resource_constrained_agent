@@ -1,10 +1,16 @@
+import json
 import os
 
 import streamlit as st
 
 from resource_agent.agent.react_agent import ReactAgent
-from resource_agent.config import load_env_file
+from resource_agent.config import load_env_file, project_root
 from resource_agent.evaluation.tasks import EVALUATION_TASKS
+from resource_agent.profile_conversion import (
+    convert_resume_text_to_profile,
+    extract_text_from_pdf_bytes,
+)
+from resource_agent.tools.personal_profile import ALLOWED_SECTIONS
 
 
 load_env_file()
@@ -21,6 +27,31 @@ def build_template_map() -> dict[str, str]:
         label = f"{evaluation_task.name} ({evaluation_task.task_id})"
         templates[label] = evaluation_task.prompt
     return templates
+
+
+def load_default_profile_text() -> str:
+    profile_path = project_root() / "data/personal_profile.json"
+    with profile_path.open("r", encoding="utf-8") as file:
+        return file.read()
+
+
+def parse_profile_text(profile_text: str) -> dict:
+    profile_data = json.loads(profile_text)
+    if not isinstance(profile_data, dict):
+        raise ValueError("Profile JSON must be an object at the top level.")
+    return profile_data
+
+
+def format_profile_text(profile_data: dict) -> str:
+    return json.dumps(profile_data, indent=2, ensure_ascii=True)
+
+
+def is_json_upload(uploaded_file) -> bool:
+    return uploaded_file is not None and uploaded_file.name.lower().endswith(".json")
+
+
+def is_pdf_upload(uploaded_file) -> bool:
+    return uploaded_file is not None and uploaded_file.name.lower().endswith(".pdf")
 
 
 def render_step(step) -> None:
@@ -93,6 +124,9 @@ if "selected_template" not in st.session_state:
 if "task_input" not in st.session_state:
     st.session_state.task_input = templates[default_template]
 
+if "profile_text" not in st.session_state:
+    st.session_state.profile_text = load_default_profile_text()
+
 with st.sidebar:
     st.header("Environment")
     has_openai_key = bool(os.getenv("OPENAI_API_KEY"))
@@ -131,6 +165,56 @@ with right_column:
     st.write("- `web_search_tool`")
     st.write("- `code_execution_tool`")
 
+    st.markdown("**Profile Sections**")
+    st.write(", ".join(sorted(ALLOWED_SECTIONS)))
+
+st.subheader("Personal Profile")
+profile_upload = st.file_uploader(
+    "Upload profile file",
+    type=["json", "pdf"],
+    help="Upload a profile JSON directly, or upload a PDF resume and convert it to JSON.",
+)
+st.caption("PDF conversion uses one additional OpenAI call before the agent run and is not counted in the agent budget.")
+profile_actions = st.columns(3)
+
+with profile_actions[0]:
+    if st.button("Load uploaded JSON", disabled=not is_json_upload(profile_upload)):
+        try:
+            uploaded_text = profile_upload.getvalue().decode("utf-8")
+            profile_data = parse_profile_text(uploaded_text)
+            st.session_state.profile_text = format_profile_text(profile_data)
+            st.success("Loaded profile JSON into the editor.")
+        except UnicodeDecodeError:
+            st.error("The uploaded JSON file must be UTF-8 encoded.")
+        except json.JSONDecodeError as exc:
+            st.error(f"The uploaded JSON file is invalid: {exc}")
+        except ValueError as exc:
+            st.error(str(exc))
+
+with profile_actions[1]:
+    if st.button(
+        "Convert uploaded PDF",
+        disabled=not is_pdf_upload(profile_upload) or not has_openai_key,
+    ):
+        try:
+            resume_text = extract_text_from_pdf_bytes(profile_upload.getvalue())
+            profile_data = convert_resume_text_to_profile(resume_text=resume_text)
+            st.session_state.profile_text = format_profile_text(profile_data)
+            st.success("Converted the PDF into profile JSON. Review it before running the agent.")
+        except Exception as exc:
+            st.error(f"PDF conversion failed: {exc}")
+
+with profile_actions[2]:
+    if st.button("Reset to default profile"):
+        st.session_state.profile_text = load_default_profile_text()
+
+st.text_area(
+    "Profile JSON",
+    key="profile_text",
+    height=320,
+    help="This profile is used only for the current browser session and does not modify the repository file.",
+)
+
 if st.button("Run Agent", type="primary"):
     task = st.session_state.task_input.strip()
 
@@ -139,12 +223,22 @@ if st.button("Run Agent", type="primary"):
     elif not has_openai_key:
         st.error("OPENAI_API_KEY is missing. Add it to your environment or Streamlit secrets.")
     else:
+        try:
+            profile_data = parse_profile_text(st.session_state.profile_text)
+        except json.JSONDecodeError as exc:
+            st.error(f"Profile JSON is invalid: {exc}")
+            st.stop()
+        except ValueError as exc:
+            st.error(str(exc))
+            st.stop()
+
         with st.spinner("Running agent..."):
             try:
                 agent = ReactAgent(
                     max_steps=max_steps,
                     max_calls=max_calls,
                     max_cost=max_cost,
+                    profile_data=profile_data,
                 )
                 state = agent.run(task)
                 st.session_state.last_result = {

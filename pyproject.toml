@@ -15,6 +15,7 @@ dependencies = [
 
 [project.optional-dependencies]
 demo = [
+  "pypdf>=5,<6",
   "streamlit>=1.45,<2",
 ]
 

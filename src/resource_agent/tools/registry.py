@@ -6,9 +6,26 @@ from resource_agent.tools.web_search import WebSearchTool
 from resource_agent.tools.base import BaseTool, ToolResult
 
 class ToolRegistry:
-    def __init__(self):
-        """Create and register the default tool instances for the agent."""
-        personal_profile = PersonalProfileTool()
+    def __init__(
+        self,
+        personal_profile_tool: BaseTool | None = None,
+        profile_data: dict[str, Any] | None = None,
+    ):
+        """Create and register the default tool instances for the agent.
+
+        Args:
+            personal_profile_tool: Optional fully constructed profile tool.
+            profile_data: Optional in-memory profile payload passed to the
+                default profile tool.
+        """
+        if personal_profile_tool is not None and profile_data is not None:
+            raise ValueError(
+                "Pass either personal_profile_tool or profile_data, not both."
+            )
+
+        personal_profile = personal_profile_tool or PersonalProfileTool(
+            profile_data=profile_data
+        )
         web_search = WebSearchTool()
         code_execution = CodeExecutionTool()
 

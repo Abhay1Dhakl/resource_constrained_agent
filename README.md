@@ -48,8 +48,10 @@ python -m pip install -r requirements.txt
 streamlit run streamlit_app.py
 ```
 
-The app will open locally in your browser and lets you enter a task, run the
-agent, and inspect the full trace and budget summary.
+The app will open locally in your browser and lets you enter a task, upload a
+PDF resume and convert it into the expected profile JSON, or edit/upload the
+profile JSON directly for the current session, then run the agent and inspect
+the full trace and budget summary.
 
 ### Docker Run
 
@@ -165,6 +167,8 @@ Recommended path:
 4. Add `OPENAI_API_KEY` and, if you want live web search, `TAVILY_API_KEY` in
    the app secrets.
 5. Deploy and use the generated `*.streamlit.app` URL as your demo link.
+6. In the app UI, upload a PDF resume to convert it into profile JSON, or
+   replace the default profile JSON manually for that session.
 
 If you do not provide `TAVILY_API_KEY`, the app still runs, but search-heavy
 tasks may stop early or return partial results.
